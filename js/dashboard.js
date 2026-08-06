@@ -491,18 +491,61 @@
     document.getElementById("us-kpi-formation").textContent = fmt(d.total_formation_reel);
     document.getElementById("us-kpi-upcoming").textContent = fmt(d.upcoming_contracts.total);
 
-    document.getElementById("us-next-week-label").textContent = d.next_week ? d.next_week.label : "S+1";
-    var nextEl = document.getElementById("us-kpi-next-week");
-    if (d.next_week && d.next_week.estimation !== null && d.next_week.estimation !== undefined) {
-      nextEl.textContent = fmt(d.next_week.estimation);
-    } else {
-      nextEl.textContent = "Non renseigné";
+    // Entrées usine — delta vs the previous week in the trend.
+    var weekSub = document.getElementById("us-kpi-week-sub");
+    if (weekSub) {
+      var wLabels = d.weekly_arrivals.labels, wValues = d.weekly_arrivals.values;
+      var curIdx = wLabels.indexOf(d.this_week_label);
+      if (curIdx > 0) {
+        var delta = wValues[curIdx] - wValues[curIdx - 1];
+        weekSub.textContent = (delta >= 0 ? "+" : "") + delta + " vs " + wLabels[curIdx - 1];
+        weekSub.className = "us-kpi-sub " + (delta > 0 ? "us-sub-up" : delta < 0 ? "us-sub-down" : "");
+      } else {
+        weekSub.textContent = "";
+      }
     }
 
+    // En formation — écart vs plan for the latest week with a known Réel.
+    var formationSub = document.getElementById("us-kpi-formation-sub");
+    if (formationSub) {
+      var fLabels = d.formation.labels, fEst = d.formation.estimation, fReel = d.formation.reel;
+      var lastKnown = -1;
+      for (var fi = fReel.length - 1; fi >= 0; fi--) { if (fReel[fi] !== null) { lastKnown = fi; break; } }
+      if (lastKnown !== -1) {
+        var fEcart = fReel[lastKnown] - fEst[lastKnown];
+        formationSub.textContent = "Écart vs plan (" + fLabels[lastKnown] + ") : " + (fEcart > 0 ? "+" : "") + fEcart;
+        formationSub.className = "us-kpi-sub " + (fEcart > 0 ? "us-sub-up" : fEcart < 0 ? "us-sub-down" : "");
+      } else {
+        formationSub.textContent = "";
+      }
+    }
+
+    // Habilitation — top department contributing to upcoming contracts.
+    var upcomingSub = document.getElementById("us-kpi-upcoming-sub");
+    if (upcomingSub) {
+      var top = d.upcoming_contracts.by_departement[0];
+      upcomingSub.textContent = top ? ("Top : " + top.label + " (" + fmt(top.effectif) + ")") : "";
+    }
+
+    function setKpiValue(elId, value) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      if (value === null || value === undefined) {
+        el.textContent = "Non renseigné";
+        el.classList.add("us-empty-val");
+      } else {
+        el.textContent = fmt(value);
+        el.classList.remove("us-empty-val");
+      }
+    }
+
+    document.getElementById("us-next-week-label").textContent = d.next_week ? d.next_week.label : "S+1";
+    setKpiValue("us-kpi-next-week", d.next_week ? d.next_week.estimation : null);
+
     document.getElementById("us-appels-week-label").textContent = d.this_week_label || "cette semaine";
-    document.getElementById("us-kpi-appels").textContent = d.appels_this_week !== null ? fmt(d.appels_this_week) : "Non renseigné";
+    setKpiValue("us-kpi-appels", d.appels_this_week);
     document.getElementById("us-visite-week-label").textContent = d.this_week_label || "cette semaine";
-    document.getElementById("us-kpi-visite").textContent = d.visite_this_week !== null ? fmt(d.visite_this_week) : "Non renseigné";
+    setKpiValue("us-kpi-visite", d.visite_this_week);
 
     setTimeout(function () {
       buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);
