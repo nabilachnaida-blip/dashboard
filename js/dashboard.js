@@ -313,12 +313,10 @@
     var knownWeeks = fsSorted.filter(function (w) { return w.reelKnown; });
     if (knownWeeks.length) totalFormationReel = knownWeeks[knownWeeks.length - 1].reel;
 
-    var nextWeekNum = cur.isoWeek < 52 ? cur.isoWeek + 1 : 1;
-    var nextYear = cur.isoWeek < 52 ? cur.isoYear : cur.isoYear + 1;
-    var nextEntry = fsByWeek[nextYear + "_" + nextWeekNum];
-    var nextWeek = {
-      iso_year: nextYear, iso_week: nextWeekNum, label: "S" + nextWeekNum,
-      estimation: nextEntry ? nextEntry.estimation : null,
+    var curFormationEntry = fsByWeek[cur.isoYear + "_" + cur.isoWeek];
+    var formationThisWeek = {
+      iso_year: cur.isoYear, iso_week: cur.isoWeek, label: "S" + cur.isoWeek,
+      estimation: curFormationEntry ? curFormationEntry.estimation : null,
     };
 
     var upcomingByDept = {};
@@ -352,7 +350,7 @@
       month_total: monthTotal,
       formation: { labels: formationLabels, estimation: formationEstimation, reel: formationReel },
       total_formation_reel: totalFormationReel,
-      next_week: nextWeek,
+      formation_this_week: formationThisWeek,
       appels_this_week: appelsThisWeek,
       visite_this_week: visiteThisWeek,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
@@ -539,8 +537,8 @@
       }
     }
 
-    document.getElementById("us-next-week-label").textContent = d.next_week ? d.next_week.label : "S+1";
-    setKpiValue("us-kpi-next-week", d.next_week ? d.next_week.estimation : null);
+    document.getElementById("us-next-week-label").textContent = d.formation_this_week ? d.formation_this_week.label : (d.this_week_label || "cette semaine");
+    setKpiValue("us-kpi-next-week", d.formation_this_week ? d.formation_this_week.estimation : null);
 
     document.getElementById("us-appels-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-appels", d.appels_this_week);
