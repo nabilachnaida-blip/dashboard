@@ -8,6 +8,7 @@
   var SHEET_ARRIVALS = "integration Usine";
   var SHEET_FORMATION_WEEKLY = "Feuil3";
   var SHEET_FORMATION_IFMIA = "En formation IFMIA";
+  var SHEET_MANUAL_KPIS = "Indicateurs Manuels";
   var ATELIER_MAP = { ferrage: "FERRAGE", montage: "MONTAGE", peinture: "PEINTURE" };
 
   var US_BLUE = "#0B3F91";
@@ -163,6 +164,51 @@
     return out;
   }
 
+  // Reads the "Indicateurs Manuels" sheet: one row per indicator (Appels
+  // téléphoniques, Visite médicale), values entered by hand per week —
+  // same S30/S31/... week-header layout as Feuil3, but flat (no
+  // Estimation/Réel split). Optional sheet: older workbooks without it
+  // simply yield no manual KPIs.
+  function parseManualKpis(rows, anchorYear) {
+    var weekRow = -1, weekCols = {};
+    for (var r = 0; r < Math.min(rows.length, 5) && weekRow === -1; r++) {
+      var row = rows[r] || [], cols = {};
+      for (var c = 0; c < row.length; c++) {
+        var v = norm(row[c]).replace(/\s+/g, "");
+        var m = v.match(/^s(\d{1,2})$/);
+        if (m) cols[c] = parseInt(m[1], 10);
+      }
+      if (Object.keys(cols).length) { weekRow = r; weekCols = cols; }
+    }
+    if (weekRow === -1) return {};
+
+    var byWeek = {};
+    function ensure(week) {
+      var key = anchorYear + "_" + week;
+      if (!byWeek[key]) byWeek[key] = { iso_year: anchorYear, iso_week: week, appels: null, visite: null };
+      return byWeek[key];
+    }
+
+    for (var i = weekRow + 1; i < rows.length; i++) {
+      var rr = rows[i] || [];
+      var label = norm(rr[0]);
+      if (!label) continue;
+      var field = null;
+      if (label.indexOf("appel") !== -1) field = "appels";
+      else if (label.indexOf("visite") !== -1 && label.indexOf("medic") !== -1) field = "visite";
+      else continue;
+      Object.keys(weekCols).forEach(function (colStr) {
+        var col = Number(colStr), week = weekCols[colStr];
+        var val = rr[col];
+        if (val === null || val === undefined || val === "") return;
+        var valInt = parseInt(val, 10);
+        if (isNaN(valInt)) return;
+        ensure(week)[field] = valInt;
+      });
+    }
+    return byWeek;
+  }
+
   function parseSuiviWorkbook(arrayBuffer) {
     var wb = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
     var missing = [SHEET_ARRIVALS, SHEET_FORMATION_WEEKLY, SHEET_FORMATION_IFMIA].filter(function (s) {
@@ -181,10 +227,17 @@
     var fsRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_FORMATION_WEEKLY], { header: 1, raw: true, defval: null });
     var ifmiaRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_FORMATION_IFMIA], { header: 1, raw: true, defval: null });
 
+    var manualKpis = {};
+    if (wb.SheetNames.indexOf(SHEET_MANUAL_KPIS) !== -1) {
+      var mkRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_MANUAL_KPIS], { header: 1, raw: true, defval: null });
+      manualKpis = parseManualKpis(mkRows, anchorYear);
+    }
+
     return {
       arrivals: arrivals,
       formation_semaine: parseFormationSemaine(fsRows, anchorYear),
       formation_ifmia: parseFormationIfmia(ifmiaRows),
+      manual_kpis: manualKpis,
     };
   }
 
@@ -283,6 +336,12 @@
     if (depParam) ifmia = ifmia.filter(function (i) { return i.ur === depParam; });
     ifmia = ifmia.slice().sort(function (a, b) { return b.date_integration_ifmia - a.date_integration_ifmia; }).slice(0, 50);
 
+    // Manual weekly indicators (Appels téléphoniques, Visite médicale) —
+    // plant-wide counts entered by hand in Excel, not department-scoped.
+    var manualEntry = (parsed.manual_kpis || {})[cur.isoYear + "_" + cur.isoWeek];
+    var appelsThisWeek = manualEntry && manualEntry.appels !== null ? manualEntry.appels : null;
+    var visiteThisWeek = manualEntry && manualEntry.visite !== null ? manualEntry.visite : null;
+
     return {
       empty: false,
       departments: presentCodes.map(function (c) { return { code: c, label: c }; }),
@@ -294,6 +353,8 @@
       formation: { labels: formationLabels, estimation: formationEstimation, reel: formationReel },
       total_formation_reel: totalFormationReel,
       next_week: nextWeek,
+      appels_this_week: appelsThisWeek,
+      visite_this_week: visiteThisWeek,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
       formation_ifmia_detail: ifmia.map(function (i) {
         return {
@@ -414,6 +475,11 @@
     } else {
       nextEl.textContent = "Non renseigné";
     }
+
+    document.getElementById("us-appels-week-label").textContent = d.this_week_label || "cette semaine";
+    document.getElementById("us-kpi-appels").textContent = d.appels_this_week !== null ? fmt(d.appels_this_week) : "Non renseigné";
+    document.getElementById("us-visite-week-label").textContent = d.this_week_label || "cette semaine";
+    document.getElementById("us-kpi-visite").textContent = d.visite_this_week !== null ? fmt(d.visite_this_week) : "Non renseigné";
 
     setTimeout(function () {
       buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);

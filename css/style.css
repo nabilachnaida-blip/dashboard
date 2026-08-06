@@ -40,6 +40,8 @@ body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--gray50);c
 .us-kpi-card.us-c3::before{background:#38D6C4;}
 .us-kpi-card.us-c4::before{background:#FF5A1F;}
 .us-kpi-card.us-c5::before{background:#6EE7D2;}
+.us-kpi-card.us-c6::before{background:#0D6FA3;}
+.us-kpi-card.us-c7::before{background:#9FEDE2;}
 .us-kpi-label{font-size:11.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
 .us-kpi-value{font-size:26px;font-weight:800;font-family:var(--font-cond);color:#1e293b;line-height:1.1;}
 
