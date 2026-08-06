@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suivi Usine</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/echarts.min.js"></script>
+<script src="js/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">Suivi Usine</div>
+  <div class="topbar-note">Page statique — lit suivi.xlsx directement</div>
+</div>
+
+<main class="page">
+
+  <div class="us-hero">
+    <div>
+      <div class="us-hero-title">Suivez votre équipe à distance</div>
+      <div class="us-hero-sub">Restez connecté(e) à votre atelier même en congé — les KPIs clés en un coup d'œil.</div>
+    </div>
+    <div class="us-hero-badge">Source : suivi.xlsx (remplacez ce fichier et poussez sur GitHub pour actualiser)</div>
+  </div>
+
+  <div id="us-error" class="us-error" style="display:none;"></div>
+  <div id="us-empty" class="us-empty" style="display:none;">
+    Aucune donnée exploitable dans suivi.xlsx.
+  </div>
+
+  <div id="us-content" style="display:none;">
+
+    <!-- Filters -->
+    <div class="us-filter-bar">
+      <div class="us-fg">
+        <label>Département</label>
+        <select id="us-dept-select">
+          <option value="">Tous les départements</option>
+        </select>
+      </div>
+      <div class="us-fg">
+        <label>Du</label>
+        <input type="date" id="us-date-from" />
+      </div>
+      <div class="us-fg">
+        <label>Au</label>
+        <input type="date" id="us-date-to" />
+      </div>
+      <button class="us-btn us-btn-ghost" onclick="usResetFilters()">Réinitialiser</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="us-kpi-grid">
+      <div class="us-kpi-card us-c1">
+        <div class="us-kpi-label">Entrées usine — <span id="us-this-week-label">cette semaine</span></div>
+        <div class="us-kpi-value" id="us-kpi-week">&mdash;</div>
+      </div>
+      <div class="us-kpi-card us-c2">
+        <div class="us-kpi-label">Total du mois</div>
+        <div class="us-kpi-value" id="us-kpi-month">&mdash;</div>
+      </div>
+      <div class="us-kpi-card us-c3">
+        <div class="us-kpi-label">En formation (réel)</div>
+        <div class="us-kpi-value" id="us-kpi-formation">&mdash;</div>
+      </div>
+      <div class="us-kpi-card us-c4">
+        <div class="us-kpi-label">Semaine prochaine — <span id="us-next-week-label">S+1</span></div>
+        <div class="us-kpi-value" id="us-kpi-next-week">&mdash;</div>
+      </div>
+      <div class="us-kpi-card us-c5">
+        <div class="us-kpi-label">Habilitation — contrats à venir</div>
+        <div class="us-kpi-value" id="us-kpi-upcoming">&mdash;</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="us-charts-row">
+      <div class="us-chart-card">
+        <div class="us-chart-title">Nombre d'entrées usine par semaine</div>
+        <div id="us-chart-weekly" class="us-chart"></div>
+      </div>
+      <div class="us-chart-card">
+        <div class="us-chart-title">Formation — Estimation vs Réel par semaine</div>
+        <div id="us-chart-formation" class="us-chart"></div>
+      </div>
+      <div class="us-chart-card">
+        <div class="us-chart-title">Contrats à venir par département</div>
+        <div id="us-chart-upcoming" class="us-chart"></div>
+      </div>
+    </div>
+
+    <!-- IFMIA detail -->
+    <div class="us-detail-card">
+      <div class="us-chart-title">Détail formation IFMIA</div>
+      <div style="overflow-x:auto;max-height:280px;">
+        <table class="us-detail-tbl">
+          <thead><tr><th>UR</th><th>Effectif</th><th>Intégration IFMIA</th><th>Intégration usine</th></tr></thead>
+          <tbody id="us-ifmia-tbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="js/dashboard.js"></script>
+</body>
+</html>
