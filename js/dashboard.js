@@ -398,14 +398,37 @@
     if (US_CHARTS.formation) US_CHARTS.formation.dispose();
     var chart = echarts.init(dom);
     US_CHARTS.formation = chart;
+
+    // Écart = Réel - Estimation, shown for the most recent week that has a known Réel.
+    var lastKnownIdx = -1;
+    for (var i = reel.length - 1; i >= 0; i--) {
+      if (reel[i] !== null && reel[i] !== undefined) { lastKnownIdx = i; break; }
+    }
+    var reelSeries = { name: "Réel", type: "bar", data: reel, barMaxWidth: 28, itemStyle: { color: US_BLUE, borderRadius: [4, 4, 0, 0] } };
+    if (lastKnownIdx !== -1) {
+      var ecart = reel[lastKnownIdx] - estimation[lastKnownIdx];
+      reelSeries.markPoint = {
+        symbol: "circle", symbolSize: 0,
+        data: [{
+          coord: [lastKnownIdx, reel[lastKnownIdx]],
+          label: {
+            show: true, position: "top", distance: 14,
+            formatter: function () { return "Écart (" + labels[lastKnownIdx] + ") : " + (ecart > 0 ? "+" : "") + ecart; },
+            color: US_ORANGE, fontWeight: "bold", fontSize: 12,
+            backgroundColor: "#FFF3EF", borderColor: US_ORANGE, borderWidth: 1, borderRadius: 4, padding: [4, 8]
+          }
+        }]
+      };
+    }
+
     chart.setOption({
       tooltip: { trigger: "axis" },
       legend: { data: ["Estimation", "Réel"], top: 0, textStyle: { fontSize: 12 } },
-      grid: { left: "3%", right: "4%", bottom: "3%", top: "15%", containLabel: true },
+      grid: { left: "3%", right: "4%", bottom: "3%", top: "18%", containLabel: true },
       xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
       yAxis: { type: "value", axisLabel: { fontSize: 11 } },
       series: [
-        { name: "Réel", type: "bar", data: reel, barMaxWidth: 28, itemStyle: { color: US_BLUE, borderRadius: [4, 4, 0, 0] } },
+        reelSeries,
         { name: "Estimation", type: "line", data: estimation, smooth: false, symbol: "circle", symbolSize: 6, lineStyle: { width: 3, color: US_ORANGE }, itemStyle: { color: US_ORANGE } }
       ]
     });
