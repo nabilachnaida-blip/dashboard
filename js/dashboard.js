@@ -69,11 +69,6 @@
     return target;
   }
 
-  function fmtDate(d) {
-    var y = d.getUTCFullYear(), m = String(d.getUTCMonth() + 1).padStart(2, "0"), day = String(d.getUTCDate()).padStart(2, "0");
-    return y + "-" + m + "-" + day;
-  }
-
   // ── Excel parsing (mirrors excel_parser.py) ─────────────────────────
   function parseArrivals(rows) {
     var headerRow = -1, colMap = {};
@@ -181,25 +176,57 @@
     };
   }
 
-  // colOffset lets this read either the "diplômés" table (col A, offset 0)
-  // or the "non diplômés" table (col F, offset 5) — same 4-column layout,
-  // side by side on the same sheet.
-  function parseFormationIfmiaTable(rows, colOffset) {
+  // Diplômés table (col A: UR/Effectifs/Date IFMIA/Date Usine).
+  function parseFormationIfmiaTable(rows) {
     var headerRow = -1;
     for (var r = 0; r < Math.min(rows.length, 10); r++) {
-      if (norm((rows[r] || [])[colOffset]) === "ur") { headerRow = r; break; }
+      if (norm((rows[r] || [])[0]) === "ur") { headerRow = r; break; }
     }
     if (headerRow === -1) return [];
     var out = [];
     for (var i = headerRow + 1; i < rows.length; i++) {
       var rr = rows[i] || [];
-      var ur = rr[colOffset], eff = rr[colOffset + 1];
+      var ur = rr[0], eff = rr[1];
       if (!clean(ur) || eff === null || eff === undefined || eff === "") continue;
-      var dateIfmia = parseDate(rr[colOffset + 2]), dateUsine = parseDate(rr[colOffset + 3]);
+      var dateIfmia = parseDate(rr[2]), dateUsine = parseDate(rr[3]);
       if (!dateIfmia) continue;
       var effInt = parseInt(eff, 10);
       if (isNaN(effInt)) continue;
       out.push({ ur: clean(ur), effectif: effInt, date_integration_ifmia: dateIfmia, date_integration_usine: dateUsine });
+    }
+    return out;
+  }
+
+  // Non-diplômés grid (col F onward: UR row × S30/S31/... week columns) —
+  // one row per department, values entered by hand per week.
+  function parseNonDiplomesGrid(rows, anchorYear) {
+    var colOffset = 5; // column F, 0-indexed
+    var headerRow = -1, weekCols = {};
+    for (var r = 0; r < Math.min(rows.length, 10) && headerRow === -1; r++) {
+      if (norm((rows[r] || [])[colOffset]) === "ur") {
+        headerRow = r;
+        var row = rows[r] || [];
+        for (var c = colOffset + 1; c < row.length; c++) {
+          var m = norm(row[c]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
+          if (m) weekCols[c] = parseInt(m[1], 10);
+        }
+      }
+    }
+    if (headerRow === -1) return [];
+
+    var out = [];
+    for (var i = headerRow + 1; i < rows.length; i++) {
+      var rr = rows[i] || [];
+      var ur = rr[colOffset];
+      if (!clean(ur)) continue;
+      Object.keys(weekCols).forEach(function (colStr) {
+        var col = Number(colStr), week = weekCols[colStr];
+        var val = rr[col];
+        if (val === null || val === undefined || val === "") return;
+        var valInt = parseInt(val, 10);
+        if (isNaN(valInt)) return;
+        out.push({ ur: clean(ur), iso_year: anchorYear, iso_week: week, effectif: valInt });
+      });
     }
     return out;
   }
@@ -226,8 +253,8 @@
     return {
       arrivals: arrivals,
       formation_semaine: weekly.formation_semaine,
-      formation_ifmia: parseFormationIfmiaTable(ifmiaRows, 0),
-      formation_ifmia_non_diplomes: parseFormationIfmiaTable(ifmiaRows, 5),
+      formation_ifmia: parseFormationIfmiaTable(ifmiaRows),
+      non_diplomes_grid: parseNonDiplomesGrid(ifmiaRows, anchorYear),
       manual_kpis: weekly.manual_kpis,
     };
   }
@@ -324,21 +351,32 @@
     var upcomingList = Object.keys(upcomingByDept).map(function (d) { return { departement: d, label: d, effectif: upcomingByDept[d] }; })
       .sort(function (a, b) { return b.effectif - a.effectif; });
 
-    var ifmia = parsed.formation_ifmia;
-    if (depParam) ifmia = ifmia.filter(function (i) { return i.ur === depParam; });
-    ifmia = ifmia.slice().sort(function (a, b) { return b.date_integration_ifmia - a.date_integration_ifmia; }).slice(0, 50);
+    // Diplômés — total headcount from the arrival table (department-scoped),
+    // not week-specific: just the running total of everyone tracked.
+    var ifmiaDip = parsed.formation_ifmia;
+    if (depParam) ifmiaDip = ifmiaDip.filter(function (i) { return i.ur === depParam; });
+    var ifmiaDiplomesTotal = null;
+    if (ifmiaDip.length) {
+      ifmiaDiplomesTotal = 0;
+      ifmiaDip.forEach(function (i) { ifmiaDiplomesTotal += i.effectif; });
+    }
 
-    // Non-diplômés — plant-wide total (same source sheet, not department-scoped).
-    var nonDiplomesTotal = 0;
-    (parsed.formation_ifmia_non_diplomes || []).forEach(function (i) { nonDiplomesTotal += i.effectif; });
+    // Non-diplômés — sum across departments (or just the selected one) for
+    // the current week, from the UR × semaine grid.
+    var nonDipRows = parsed.non_diplomes_grid || [];
+    if (depParam) nonDipRows = nonDipRows.filter(function (r) { return r.ur === depParam; });
+    var ifmiaNonDiplomesThisWeek = null;
+    nonDipRows.forEach(function (r) {
+      if (r.iso_year === cur.isoYear && r.iso_week === cur.isoWeek) {
+        ifmiaNonDiplomesThisWeek = (ifmiaNonDiplomesThisWeek || 0) + r.effectif;
+      }
+    });
 
     // Manual weekly indicators (Appels téléphoniques, Visite médicale) —
     // plant-wide counts entered by hand in Excel, not department-scoped.
     var manualEntry = (parsed.manual_kpis || {})[cur.isoYear + "_" + cur.isoWeek];
     var appelsThisWeek = manualEntry && manualEntry.appels !== null ? manualEntry.appels : null;
     var visiteThisWeek = manualEntry && manualEntry.visite !== null ? manualEntry.visite : null;
-    var ifmiaDiplomesThisWeek = manualEntry && manualEntry.ifmia_diplomes !== null ? manualEntry.ifmia_diplomes : null;
-    var ifmiaNonDiplomesThisWeek = manualEntry && manualEntry.ifmia_non_diplomes !== null ? manualEntry.ifmia_non_diplomes : null;
 
     return {
       empty: false,
@@ -352,17 +390,9 @@
       formation: { labels: formationLabels, estimation: formationEstimation, reel: formationReel },
       appels_this_week: appelsThisWeek,
       visite_this_week: visiteThisWeek,
-      ifmia_diplomes_this_week: ifmiaDiplomesThisWeek,
+      ifmia_diplomes_total: ifmiaDiplomesTotal,
       ifmia_non_diplomes_this_week: ifmiaNonDiplomesThisWeek,
-      formation_non_diplomes_total: nonDiplomesTotal,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
-      formation_ifmia_detail: ifmia.map(function (i) {
-        return {
-          ur: i.ur, effectif: i.effectif,
-          date_integration_ifmia: fmtDate(i.date_integration_ifmia),
-          date_integration_usine: i.date_integration_usine ? fmtDate(i.date_integration_usine) : null,
-        };
-      }),
     };
   }
 
@@ -455,18 +485,6 @@
     });
   }
 
-  function renderIfmiaTable(rows) {
-    var tbody = document.getElementById("us-ifmia-tbl-body");
-    if (!tbody) return;
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:16px;">Aucune donnée</td></tr>';
-      return;
-    }
-    tbody.innerHTML = rows.map(function (r) {
-      return "<tr><td>" + r.ur + "</td><td>" + fmt(r.effectif) + "</td><td>" + r.date_integration_ifmia + "</td><td>" + (r.date_integration_usine || "—") + "</td></tr>";
-    }).join("");
-  }
-
   function populateDepartments(depts, selected) {
     var sel = document.getElementById("us-dept-select");
     if (!sel || deptsLoaded) return;
@@ -491,8 +509,7 @@
     document.getElementById("us-kpi-month-label").textContent = d.month_label || "";
     document.getElementById("us-kpi-upcoming").textContent = fmt(d.upcoming_contracts.total);
 
-    document.getElementById("us-ifmia-dip-week-label").textContent = d.this_week_label || "cette semaine";
-    setKpiValue("us-kpi-formation", d.ifmia_diplomes_this_week);
+    setKpiValue("us-kpi-formation", d.ifmia_diplomes_total);
     document.getElementById("us-ifmia-nondip-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-next-week", d.ifmia_non_diplomes_this_week);
 
@@ -535,24 +552,11 @@
     document.getElementById("us-visite-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-visite", d.visite_this_week);
 
-    var nonDiplomesEl = document.getElementById("us-kpi-non-diplomes");
-    if (nonDiplomesEl) {
-      if (d.formation_non_diplomes_total > 0) {
-        nonDiplomesEl.textContent = fmt(d.formation_non_diplomes_total);
-        nonDiplomesEl.classList.remove("us-empty-val");
-      } else {
-        nonDiplomesEl.textContent = "Non renseigné";
-        nonDiplomesEl.classList.add("us-empty-val");
-      }
-    }
-
     setTimeout(function () {
       buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);
       buildFormationChart(d.formation.labels, d.formation.estimation, d.formation.reel);
       buildUpcomingChart(d.upcoming_contracts.by_departement);
     }, 50);
-
-    renderIfmiaTable(d.formation_ifmia_detail);
   }
 
   function refresh() {

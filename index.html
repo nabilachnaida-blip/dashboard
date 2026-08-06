@@ -17,11 +17,11 @@
     </div>
     <div class="us-modal-body">
       <p>Ce tableau de bord a été mis en place pour vous permettre de suivre, où que vous soyez, l'activité de nos équipes opérateurs : arrivées à l'usine, avancement des formations, habilitations et visites médicales à venir.</p>
-      <p>L'objectif est simple : rester connecté(e) à la réalité du terrain, même à distance — en déplacement, en réunion ou en congé — sans dépendre d'un reporting manuel.</p>
+      <p>L'objectif est simple : rester connecté(e) à la réalité du terrain, même à distance — en déplacement ou en congé — sans dépendre d'un reporting manuel.</p>
       <p>Bonne consultation.</p>
       <div class="us-modal-signature">
         <div class="us-modal-signature-name">Nabila Chnaida</div>
-        <div class="us-modal-signature-role">Directrice des Ressources Humaines</div>
+        <div class="us-modal-signature-role">HR Talent </div>
       </div>
     </div>
     <button class="us-btn us-modal-close" onclick="usCloseWelcome()">C'est compris</button>
@@ -83,7 +83,7 @@
       <div class="us-kpi-card us-c3">
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
         <div class="us-kpi-body">
-          <div class="us-kpi-label">En formation à IFMIA (diplômés) — <span id="us-ifmia-dip-week-label">cette semaine</span></div>
+          <div class="us-kpi-label">En formation à IFMIA (diplômés)</div>
           <div class="us-kpi-value" id="us-kpi-formation">&mdash;</div>
         </div>
       </div>
@@ -116,13 +116,6 @@
           <div class="us-kpi-value" id="us-kpi-visite">&mdash;</div>
         </div>
       </div>
-      <div class="us-kpi-card us-c8">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">En formation IFMIA — non diplômés</div>
-          <div class="us-kpi-value" id="us-kpi-non-diplomes">&mdash;</div>
-        </div>
-      </div>
     </div>
 
     <!-- Charts -->
@@ -138,17 +131,6 @@
       <div class="us-chart-card">
         <div class="us-chart-title">Contrats à venir par département</div>
         <div id="us-chart-upcoming" class="us-chart"></div>
-      </div>
-    </div>
-
-    <!-- IFMIA detail -->
-    <div class="us-detail-card">
-      <div class="us-chart-title">Détail formation IFMIA</div>
-      <div style="overflow-x:auto;max-height:280px;">
-        <table class="us-detail-tbl">
-          <thead><tr><th>UR</th><th>Effectif</th><th>Intégration IFMIA</th><th>Intégration usine</th></tr></thead>
-          <tbody id="us-ifmia-tbl-body"></tbody>
-        </table>
       </div>
     </div>
 
