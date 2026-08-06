@@ -144,18 +144,21 @@
     return Object.keys(merged).map(function (k) { return merged[k]; });
   }
 
-  function parseFormationIfmia(rows) {
+  // colOffset lets this read either the "diplômés" table (col A, offset 0)
+  // or the "non diplômés" table (col F, offset 5) — same 4-column layout,
+  // side by side on the same sheet.
+  function parseFormationIfmiaTable(rows, colOffset) {
     var headerRow = -1;
     for (var r = 0; r < Math.min(rows.length, 10); r++) {
-      if (norm((rows[r] || [])[0]) === "ur") { headerRow = r; break; }
+      if (norm((rows[r] || [])[colOffset]) === "ur") { headerRow = r; break; }
     }
     if (headerRow === -1) return [];
     var out = [];
     for (var i = headerRow + 1; i < rows.length; i++) {
       var rr = rows[i] || [];
-      var ur = rr[0], eff = rr[1];
+      var ur = rr[colOffset], eff = rr[colOffset + 1];
       if (!clean(ur) || eff === null || eff === undefined || eff === "") continue;
-      var dateIfmia = parseDate(rr[2]), dateUsine = parseDate(rr[3]);
+      var dateIfmia = parseDate(rr[colOffset + 2]), dateUsine = parseDate(rr[colOffset + 3]);
       if (!dateIfmia) continue;
       var effInt = parseInt(eff, 10);
       if (isNaN(effInt)) continue;
@@ -236,7 +239,8 @@
     return {
       arrivals: arrivals,
       formation_semaine: parseFormationSemaine(fsRows, anchorYear),
-      formation_ifmia: parseFormationIfmia(ifmiaRows),
+      formation_ifmia: parseFormationIfmiaTable(ifmiaRows, 0),
+      formation_ifmia_non_diplomes: parseFormationIfmiaTable(ifmiaRows, 5),
       manual_kpis: manualKpis,
     };
   }
@@ -334,6 +338,10 @@
     if (depParam) ifmia = ifmia.filter(function (i) { return i.ur === depParam; });
     ifmia = ifmia.slice().sort(function (a, b) { return b.date_integration_ifmia - a.date_integration_ifmia; }).slice(0, 50);
 
+    // Non-diplômés — plant-wide total (same source sheet, not department-scoped).
+    var nonDiplomesTotal = 0;
+    (parsed.formation_ifmia_non_diplomes || []).forEach(function (i) { nonDiplomesTotal += i.effectif; });
+
     // Manual weekly indicators (Appels téléphoniques, Visite médicale) —
     // plant-wide counts entered by hand in Excel, not department-scoped.
     var manualEntry = (parsed.manual_kpis || {})[cur.isoYear + "_" + cur.isoWeek];
@@ -353,6 +361,7 @@
       formation_this_week: formationThisWeek,
       appels_this_week: appelsThisWeek,
       visite_this_week: visiteThisWeek,
+      formation_non_diplomes_total: nonDiplomesTotal,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
       formation_ifmia_detail: ifmia.map(function (i) {
         return {
@@ -544,6 +553,17 @@
     setKpiValue("us-kpi-appels", d.appels_this_week);
     document.getElementById("us-visite-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-visite", d.visite_this_week);
+
+    var nonDiplomesEl = document.getElementById("us-kpi-non-diplomes");
+    if (nonDiplomesEl) {
+      if (d.formation_non_diplomes_total > 0) {
+        nonDiplomesEl.textContent = fmt(d.formation_non_diplomes_total);
+        nonDiplomesEl.classList.remove("us-empty-val");
+      } else {
+        nonDiplomesEl.textContent = "Non renseigné";
+        nonDiplomesEl.classList.add("us-empty-val");
+      }
+    }
 
     setTimeout(function () {
       buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);
