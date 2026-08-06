@@ -8,6 +8,21 @@
 *{box-sizing:border-box;}
 body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--gray50);color:var(--gray800);}
 
+.us-modal-overlay{position:fixed;inset:0;background:rgba(7,44,90,.55);z-index:9998;
+                   display:none;align-items:center;justify-content:center;padding:20px;}
+.us-modal-overlay.us-show{display:flex;}
+.us-modal-box{background:#fff;border-radius:16px;max-width:520px;width:100%;
+              box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;animation:us-modal-in .25s ease both;}
+@keyframes us-modal-in{from{opacity:0;transform:translateY(10px) scale(.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+.us-modal-header{background:linear-gradient(120deg,#0B3F91 0%,#0D6FA3 55%,#00B3B8 100%);padding:22px 28px;}
+.us-modal-title{font-family:var(--font-cond);font-size:20px;font-weight:800;color:#fff;}
+.us-modal-body{padding:24px 28px;}
+.us-modal-body p{font-size:13.5px;line-height:1.65;color:#334155;margin:0 0 14px;}
+.us-modal-signature{margin-top:18px;padding-top:16px;border-top:1px solid #e2e8f0;}
+.us-modal-signature-name{font-size:14px;font-weight:800;color:#0B3F91;font-family:var(--font-cond);}
+.us-modal-signature-role{font-size:12px;color:#64748b;margin-top:2px;}
+.us-modal-close{width:calc(100% - 56px);margin:0 28px 24px;}
+
 .page{max-width:1500px;margin:0 auto;padding:24px 28px;}
 
 .us-hero{background:linear-gradient(120deg,#0B3F91 0%,#0D6FA3 55%,#00B3B8 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:22px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;box-shadow:0 8px 24px rgba(11,63,145,.25);}
