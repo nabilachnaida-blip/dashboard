@@ -13,6 +13,7 @@
 
   var US_BLUE = "#0B3F91";
   var US_ORANGE = "#FF5A1F";
+  var US_ECART = "#c2410c";
   var US_CAT_COLORS = ["#0B3F91", "#0D6FA3", "#00B3B8", "#38D6C4", "#6EE7D2", "#9FEDE2", "#FF5A1F", "#4DA8DA"];
 
   // ── text helpers ─────────────────────────────────────────────────────
@@ -460,37 +461,21 @@
     var chart = echarts.init(dom);
     US_CHARTS.formation = chart;
 
-    // Écart = Réel - Estimation, shown for the most recent week that has a known Réel.
-    var lastKnownIdx = -1;
-    for (var i = reel.length - 1; i >= 0; i--) {
-      if (reel[i] !== null && reel[i] !== undefined) { lastKnownIdx = i; break; }
-    }
-    var reelSeries = { name: "Réel", type: "bar", data: reel, barMaxWidth: 28, itemStyle: { color: US_BLUE, borderRadius: [4, 4, 0, 0] } };
-    if (lastKnownIdx !== -1) {
-      var ecart = reel[lastKnownIdx] - estimation[lastKnownIdx];
-      reelSeries.markPoint = {
-        symbol: "circle", symbolSize: 0,
-        data: [{
-          coord: [lastKnownIdx, reel[lastKnownIdx]],
-          label: {
-            show: true, position: "top", distance: 14,
-            formatter: function () { return "Écart (" + labels[lastKnownIdx] + ") : " + (ecart > 0 ? "+" : "") + ecart; },
-            color: US_ORANGE, fontWeight: "bold", fontSize: 12,
-            backgroundColor: "#FFF3EF", borderColor: US_ORANGE, borderWidth: 1, borderRadius: 4, padding: [4, 8]
-          }
-        }]
-      };
-    }
+    // Écart = Réel - Estimation, plotted for every week that has a known Réel.
+    var ecart = reel.map(function (r, i) {
+      return (r !== null && r !== undefined) ? (r - estimation[i]) : null;
+    });
 
     chart.setOption({
       tooltip: { trigger: "axis" },
-      legend: { data: ["Estimation", "Réel"], top: 0, textStyle: { fontSize: 12 } },
+      legend: { data: ["Estimation", "Réel", "Écart"], top: 0, textStyle: { fontSize: 12 } },
       grid: { left: "3%", right: "4%", bottom: "3%", top: "18%", containLabel: true },
       xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
       yAxis: { type: "value", axisLabel: { fontSize: 11 } },
       series: [
-        reelSeries,
-        { name: "Estimation", type: "line", data: estimation, smooth: false, symbol: "circle", symbolSize: 6, lineStyle: { width: 3, color: US_ORANGE }, itemStyle: { color: US_ORANGE } }
+        { name: "Réel", type: "bar", data: reel, barMaxWidth: 28, itemStyle: { color: US_BLUE, borderRadius: [4, 4, 0, 0] } },
+        { name: "Estimation", type: "line", data: estimation, smooth: false, symbol: "circle", symbolSize: 6, lineStyle: { width: 3, color: US_ORANGE }, itemStyle: { color: US_ORANGE } },
+        { name: "Écart", type: "line", data: ecart, smooth: false, symbol: "circle", symbolSize: 6, connectNulls: false, lineStyle: { width: 2, type: "dashed", color: US_ECART }, itemStyle: { color: US_ECART } }
       ]
     });
   }
