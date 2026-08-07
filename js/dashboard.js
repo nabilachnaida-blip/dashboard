@@ -359,21 +359,43 @@
     var MONTH_NAMES_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
     var monthLabel = MONTH_NAMES_FR[refDate.getUTCMonth()];
 
+    // Réel per atelier/semaine is calculated live from the "integration
+    // Usine" arrivals (matched by département FER/MON/PEI) — never typed
+    // by hand. Estimation stays the manually-entered plan from Indicateurs
+    // Hebdomadaires.
+    var ATELIER_DEPT = { FERRAGE: "FER", MONTAGE: "MON", PEINTURE: "PEI" };
+    var arrivalsByAtelierWeek = {};
+    arrivals.forEach(function (a) {
+      var atelier = null;
+      Object.keys(ATELIER_DEPT).forEach(function (k) { if (ATELIER_DEPT[k] === a.departement) atelier = k; });
+      if (!atelier) return;
+      var info = isoWeekInfo(a.date_arrivee_usine);
+      var key = atelier + "_" + info.isoYear + "_" + info.isoWeek;
+      arrivalsByAtelierWeek[key] = (arrivalsByAtelierWeek[key] || 0) + a.effectif;
+    });
+
+    var atelierByWeek = {}; // atelier -> [{iso_year, iso_week, estimation, reel}]
     var fsByWeek = {};
     parsed.formation_semaine.forEach(function (fs) {
+      var reelVal = arrivalsByAtelierWeek[fs.atelier + "_" + fs.iso_year + "_" + fs.iso_week] || 0;
+
+      if (!atelierByWeek[fs.atelier]) atelierByWeek[fs.atelier] = [];
+      atelierByWeek[fs.atelier].push({ iso_year: fs.iso_year, iso_week: fs.iso_week, estimation: fs.estimation || 0, reel: reelVal });
+
       var key = fs.iso_year + "_" + fs.iso_week;
-      if (!fsByWeek[key]) fsByWeek[key] = { year: fs.iso_year, week: fs.iso_week, estimation: 0, reel: 0, reelKnown: false };
+      if (!fsByWeek[key]) fsByWeek[key] = { year: fs.iso_year, week: fs.iso_week, estimation: 0, reel: 0 };
       fsByWeek[key].estimation += fs.estimation || 0;
-      if (fs.reel !== null && fs.reel !== undefined) {
-        fsByWeek[key].reel += fs.reel;
-        fsByWeek[key].reelKnown = true;
-      }
+      fsByWeek[key].reel += reelVal;
     });
+    Object.keys(atelierByWeek).forEach(function (k) {
+      atelierByWeek[k].sort(function (x, y) { return x.iso_year - y.iso_year || x.iso_week - y.iso_week; });
+    });
+
     var fsSorted = Object.keys(fsByWeek).map(function (k) { return fsByWeek[k]; })
       .sort(function (x, y) { return x.year - y.year || x.week - y.week; });
     var formationLabels = fsSorted.map(function (w) { return "S" + w.week; });
     var formationEstimation = fsSorted.map(function (w) { return w.estimation; });
-    var formationReel = fsSorted.map(function (w) { return w.reelKnown ? w.reel : null; });
+    var formationReel = fsSorted.map(function (w) { return w.reel; });
 
     var upcomingByDept = {};
     arrivals.forEach(function (a) {
@@ -429,6 +451,7 @@
       ifmia_non_diplomes_this_week: ifmiaNonDiplomesThisWeek,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
       problematiques: parsed.problematiques,
+      atelier_formation: atelierByWeek,
     };
   }
 
@@ -524,6 +547,47 @@
     }).join("");
   }
 
+  var ATELIER_ORDER = [
+    { key: "FERRAGE", label: "Ferrage" },
+    { key: "MONTAGE", label: "Montage" },
+    { key: "PEINTURE", label: "Peinture" }
+  ];
+
+  function renderAtelierTable(atelierByWeek) {
+    var thead = document.getElementById("us-atelier-tbl-head");
+    var tbody = document.getElementById("us-atelier-tbl-body");
+    if (!thead || !tbody) return;
+
+    var weeksRef = null;
+    ATELIER_ORDER.forEach(function (o) {
+      if (!weeksRef && atelierByWeek[o.key] && atelierByWeek[o.key].length) weeksRef = atelierByWeek[o.key];
+    });
+    if (!weeksRef) {
+      thead.innerHTML = "";
+      tbody.innerHTML = '<tr><td style="text-align:center;color:#94a3b8;padding:16px;">Aucune donnée</td></tr>';
+      return;
+    }
+
+    var weekLabels = weeksRef.map(function (w) { return "S" + w.iso_week; });
+    thead.innerHTML = "<tr><th>Atelier</th><th>Type</th>" + weekLabels.map(function (l) { return "<th>" + l + "</th>"; }).join("") + "</tr>";
+
+    var rowsHtml = "";
+    ATELIER_ORDER.forEach(function (o) {
+      var rows = atelierByWeek[o.key] || [];
+      var estCells = rows.map(function (r) { return "<td>" + fmt(r.estimation) + "</td>"; }).join("");
+      var reelCells = rows.map(function (r) { return "<td>" + fmt(r.reel) + "</td>"; }).join("");
+      var ecartCells = rows.map(function (r) {
+        var e = r.reel - r.estimation;
+        var color = e > 0 ? "#0a7c55" : e < 0 ? "#c2410c" : "#1e293b";
+        return '<td style="color:' + color + ';font-weight:700;">' + (e > 0 ? "+" : "") + e + "</td>";
+      }).join("");
+      rowsHtml += "<tr><td rowspan=\"3\" style=\"font-weight:700;\">" + o.label + "</td><td>Estimation</td>" + estCells + "</tr>";
+      rowsHtml += "<tr><td>Réel</td>" + reelCells + "</tr>";
+      rowsHtml += "<tr><td>Écart</td>" + ecartCells + "</tr>";
+    });
+    tbody.innerHTML = rowsHtml;
+  }
+
   function populateDepartments(depts, selected) {
     var sel = document.getElementById("us-dept-select");
     if (!sel || deptsLoaded) return;
@@ -592,6 +656,7 @@
     setKpiValue("us-kpi-visite", d.visite_this_week);
 
     renderFormationTable(d.formation.labels, d.formation.estimation, d.formation.reel);
+    renderAtelierTable(d.atelier_formation);
 
     var prob = d.problematiques;
     var insightCard = document.getElementById("us-insight-card");
