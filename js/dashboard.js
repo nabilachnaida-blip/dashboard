@@ -408,6 +408,19 @@
     var upcomingList = Object.keys(upcomingByDept).map(function (d) { return { departement: d, label: d, effectif: upcomingByDept[d] }; })
       .sort(function (a, b) { return b.effectif - a.effectif; });
 
+    // Répartition par département du 1er juillet à aujourd'hui — a fixed
+    // reporting window (not affected by the Semaine filter), calculated
+    // live from the "integration Usine" arrivals, department-scoped.
+    var julyStart = new Date(Date.UTC(today.getUTCFullYear(), 6, 1));
+    var julyDeptSums = {};
+    parsed.arrivals.forEach(function (a) {
+      if (scopeCodes.indexOf(a.departement) === -1) return;
+      if (a.date_arrivee_usine < julyStart || a.date_arrivee_usine > today) return;
+      julyDeptSums[a.departement] = (julyDeptSums[a.departement] || 0) + a.effectif;
+    });
+    var julyDeptList = Object.keys(julyDeptSums).sort().map(function (d) { return { departement: d, effectif: julyDeptSums[d] }; });
+    var julyDeptTotal = julyDeptList.reduce(function (s, r) { return s + r.effectif; }, 0);
+
     // Diplômés — total headcount from the arrival table (department-scoped),
     // not week-specific: just the running total of everyone tracked.
     var ifmiaDip = parsed.formation_ifmia;
@@ -452,6 +465,7 @@
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
       problematiques: parsed.problematiques,
       atelier_formation: atelierByWeek,
+      july_to_today: { rows: julyDeptList, total: julyDeptTotal, from: julyStart, to: today },
     };
   }
 
@@ -564,6 +578,28 @@
     tbody.innerHTML = rowsHtml;
   }
 
+  function fmtDateFr(d) {
+    var day = String(d.getUTCDate()).padStart(2, "0");
+    var month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    return day + "/" + month;
+  }
+
+  function renderJulyTable(julyData) {
+    var title = document.getElementById("us-july-title");
+    var tbody = document.getElementById("us-july-tbl-body");
+    if (!tbody) return;
+    if (title) title.textContent = "Répartition par département — du " + fmtDateFr(julyData.from) + " au " + fmtDateFr(julyData.to);
+    if (!julyData.rows.length) {
+      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#94a3b8;padding:16px;">Aucune donnée</td></tr>';
+      return;
+    }
+    var rowsHtml = julyData.rows.map(function (r) {
+      return "<tr><td>" + r.departement + "</td><td>" + fmt(r.effectif) + "</td></tr>";
+    }).join("");
+    rowsHtml += '<tr style="font-weight:800;background:#f8fafc;"><td>Total général</td><td>' + fmt(julyData.total) + "</td></tr>";
+    tbody.innerHTML = rowsHtml;
+  }
+
   function populateDepartments(depts, selected) {
     var sel = document.getElementById("us-dept-select");
     if (!sel || deptsLoaded) return;
@@ -644,6 +680,7 @@
     setKpiValue("us-kpi-visite", d.visite_this_week);
 
     renderAtelierTable(d.atelier_formation);
+    renderJulyTable(d.july_to_today);
 
     var prob = d.problematiques;
     var insightCard = document.getElementById("us-insight-card");
