@@ -13,7 +13,6 @@
 
   var US_BLUE = "#0B3F91";
   var US_ORANGE = "#FF5A1F";
-  var US_ECART = "#c2410c";
   var US_CAT_COLORS = ["#0B3F91", "#0D6FA3", "#00B3B8", "#38D6C4", "#6EE7D2", "#9FEDE2", "#FF5A1F", "#4DA8DA"];
 
   // ── text helpers ─────────────────────────────────────────────────────
@@ -286,6 +285,7 @@
 
     return {
       arrivals: arrivals,
+      anchor_year: anchorYear,
       formation_semaine: weekly.formation_semaine,
       formation_ifmia: parseFormationIfmiaTable(ifmiaRows),
       non_diplomes_grid: parseNonDiplomesGrid(ifmiaRows, anchorYear),
@@ -459,6 +459,7 @@
   var US_CHARTS = {};
   var parsedWorkbook = null;
   var deptsLoaded = false;
+  var weeksLoaded = false;
 
   function fmt(n) { return (n || 0).toLocaleString("fr-FR"); }
 
@@ -488,21 +489,15 @@
     var chart = echarts.init(dom);
     US_CHARTS.formation = chart;
 
-    // Écart = Réel - Estimation, plotted for every week that has a known Réel.
-    var ecart = reel.map(function (r, i) {
-      return (r !== null && r !== undefined) ? (r - estimation[i]) : null;
-    });
-
     chart.setOption({
       tooltip: { trigger: "axis" },
-      legend: { data: ["Estimation", "Réel", "Écart"], top: 0, textStyle: { fontSize: 12 } },
+      legend: { data: ["Estimation", "Réel"], top: 0, textStyle: { fontSize: 12 } },
       grid: { left: "3%", right: "4%", bottom: "3%", top: "18%", containLabel: true },
       xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
       yAxis: { type: "value", axisLabel: { fontSize: 11 } },
       series: [
         { name: "Réel", type: "bar", data: reel, barMaxWidth: 28, itemStyle: { color: US_BLUE, borderRadius: [4, 4, 0, 0] } },
-        { name: "Estimation", type: "line", data: estimation, smooth: false, symbol: "circle", symbolSize: 6, lineStyle: { width: 3, color: US_ORANGE }, itemStyle: { color: US_ORANGE } },
-        { name: "Écart", type: "line", data: ecart, smooth: false, symbol: "circle", symbolSize: 6, connectNulls: false, lineStyle: { width: 2, type: "dashed", color: US_ECART }, itemStyle: { color: US_ECART } }
+        { name: "Estimation", type: "line", data: estimation, smooth: false, symbol: "circle", symbolSize: 6, lineStyle: { width: 3, color: US_ORANGE }, itemStyle: { color: US_ORANGE } }
       ]
     });
   }
@@ -600,11 +595,23 @@
     deptsLoaded = true;
   }
 
+  function populateWeeks(weekLabels) {
+    var sel = document.getElementById("us-week-select");
+    if (!sel || weeksLoaded || !weekLabels || !weekLabels.length) return;
+    weekLabels.forEach(function (label) {
+      var opt = document.createElement("option");
+      opt.value = label; opt.textContent = label;
+      sel.appendChild(opt);
+    });
+    weeksLoaded = true;
+  }
+
   function render(d) {
     document.getElementById("us-content").style.display = "block";
     document.getElementById("us-empty").style.display = "none";
 
     populateDepartments(d.departments, d.selected_departement);
+    populateWeeks(d.formation.labels);
 
     document.getElementById("us-this-week-label").textContent = d.this_week_label || "cette semaine";
     document.getElementById("us-kpi-week").textContent = fmt(d.this_week_total);
@@ -684,11 +691,18 @@
     var errEl = document.getElementById("us-error");
     if (errEl) errEl.style.display = "none";
     try {
-      var filters = {
-        departement: document.getElementById("us-dept-select").value,
-        date_from: document.getElementById("us-date-from").value,
-        date_to: document.getElementById("us-date-to").value,
-      };
+      var filters = { departement: document.getElementById("us-dept-select").value };
+      var weekVal = document.getElementById("us-week-select").value; // e.g. "S32"
+      if (weekVal && parsedWorkbook.anchor_year) {
+        var weekNum = parseInt(weekVal.replace(/^S/i, ""), 10);
+        if (!isNaN(weekNum)) {
+          var monday = isoWeekMonday(parsedWorkbook.anchor_year, weekNum);
+          var sunday = new Date(monday);
+          sunday.setUTCDate(sunday.getUTCDate() + 6);
+          filters.date_from = monday.toISOString().slice(0, 10);
+          filters.date_to = sunday.toISOString().slice(0, 10);
+        }
+      }
       var d = computeDashboardData(parsedWorkbook, filters);
       if (d.empty) {
         document.getElementById("us-content").style.display = "none";
@@ -703,8 +717,7 @@
 
   window.usResetFilters = function () {
     document.getElementById("us-dept-select").value = "";
-    document.getElementById("us-date-from").value = "";
-    document.getElementById("us-date-to").value = "";
+    document.getElementById("us-week-select").value = "";
     refresh();
   };
 
@@ -724,8 +737,7 @@
       });
 
     document.getElementById("us-dept-select").addEventListener("change", refresh);
-    document.getElementById("us-date-from").addEventListener("change", refresh);
-    document.getElementById("us-date-to").addEventListener("change", refresh);
+    document.getElementById("us-week-select").addEventListener("change", refresh);
   }
 
   window.addEventListener("resize", function () {
