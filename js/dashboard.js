@@ -485,6 +485,25 @@
     });
   }
 
+  function renderFormationTable(labels, estimation, reel) {
+    var tbody = document.getElementById("us-formation-tbl-body");
+    if (!tbody) return;
+    if (!labels.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:16px;">Aucune donnée</td></tr>';
+      return;
+    }
+    tbody.innerHTML = labels.map(function (label, i) {
+      var est = estimation[i];
+      var reelVal = reel[i];
+      var known = reelVal !== null && reelVal !== undefined;
+      var ecart = known ? reelVal - est : null;
+      var ecartCell = known
+        ? '<td style="color:' + (ecart > 0 ? "#0a7c55" : ecart < 0 ? "#c2410c" : "#1e293b") + ';font-weight:700;">' + (ecart > 0 ? "+" : "") + ecart + "</td>"
+        : '<td style="color:#94a3b8;">—</td>';
+      return "<tr><td>" + label + "</td><td>" + fmt(est) + "</td><td>" + (known ? fmt(reelVal) : '<span style="color:#94a3b8;">—</span>') + "</td>" + ecartCell + "</tr>";
+    }).join("");
+  }
+
   function populateDepartments(depts, selected) {
     var sel = document.getElementById("us-dept-select");
     if (!sel || deptsLoaded) return;
@@ -551,6 +570,8 @@
     setKpiValue("us-kpi-appels", d.appels_this_week);
     document.getElementById("us-visite-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-visite", d.visite_this_week);
+
+    renderFormationTable(d.formation.labels, d.formation.estimation, d.formation.reel);
 
     setTimeout(function () {
       buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);
