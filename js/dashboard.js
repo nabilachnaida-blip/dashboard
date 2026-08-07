@@ -233,17 +233,21 @@
     return out;
   }
 
-  // Optional "Problematiques" sheet: a free-text description plus two
-  // drop-off percentages, entered by hand — key/value rows (col A / col B).
+  // Optional "Problematiques" sheet: an intro line, a numbered list of
+  // "Raison N" rows, and two drop-off percentages — key/value rows (col A /
+  // col B), entered by hand.
   function parseProblematiques(rows) {
-    var result = { description: "", pct_visite_formation: null, pct_parcours_formation: null };
+    var result = { intro: "", reasons: [], pct_visite_formation: null, pct_parcours_formation: null };
     for (var i = 1; i < rows.length; i++) {
       var rr = rows[i] || [];
       var label = norm(rr[0]);
       var val = rr[1];
       if (!label) continue;
-      if (label.indexOf("description") !== -1) {
-        result.description = clean(val);
+      if (label.indexOf("raison") !== -1) {
+        var reason = clean(val);
+        if (reason) result.reasons.push(reason);
+      } else if (label.indexOf("intro") !== -1 || label === "description") {
+        result.intro = clean(val);
       } else if (label.indexOf("visite") !== -1) {
         var n1 = parseInt(val, 10);
         if (!isNaN(n1)) result.pct_visite_formation = n1;
@@ -274,7 +278,7 @@
     var ifmiaRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_FORMATION_IFMIA], { header: 1, raw: true, defval: null });
     var weekly = parseIndicateursHebdomadaires(wiRows, anchorYear);
 
-    var problematiques = { description: "", pct_visite_formation: null, pct_parcours_formation: null };
+    var problematiques = { intro: "", reasons: [], pct_visite_formation: null, pct_parcours_formation: null };
     if (wb.SheetNames.indexOf(SHEET_PROBLEMATIQUES) !== -1) {
       var probRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_PROBLEMATIQUES], { header: 1, raw: true, defval: null });
       problematiques = parseProblematiques(probRows);
@@ -592,10 +596,12 @@
     var prob = d.problematiques;
     var insightCard = document.getElementById("us-insight-card");
     if (insightCard) {
-      var hasContent = prob && (prob.description || prob.pct_visite_formation !== null || prob.pct_parcours_formation !== null);
+      var hasContent = prob && (prob.intro || prob.reasons.length || prob.pct_visite_formation !== null || prob.pct_parcours_formation !== null);
       insightCard.style.display = hasContent ? "block" : "none";
       if (hasContent) {
-        document.getElementById("us-insight-text").textContent = prob.description || "";
+        document.getElementById("us-insight-intro").textContent = prob.intro || "";
+        var reasonsEl = document.getElementById("us-insight-reasons");
+        reasonsEl.innerHTML = prob.reasons.map(function (r) { return "<li>" + r + "</li>"; }).join("");
         document.getElementById("us-insight-visite").textContent = prob.pct_visite_formation !== null ? prob.pct_visite_formation + "%" : "Non renseigné";
         document.getElementById("us-insight-parcours").textContent = prob.pct_parcours_formation !== null ? prob.pct_parcours_formation + "%" : "Non renseigné";
       }
