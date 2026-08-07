@@ -8,7 +8,17 @@
 <script src="js/echarts.min.js"></script>
 <script src="js/xlsx.full.min.js"></script>
 </head>
-<body>
+<body class="us-locked">
+
+<div class="us-gate-overlay" id="us-gate-overlay">
+  <form class="us-gate-box" id="us-gate-form">
+    <div class="us-gate-title">Suivi Usine</div>
+    <div class="us-gate-sub">Accès protégé — entrez le code pour continuer.</div>
+    <input type="password" id="us-gate-input" class="us-gate-input" autocomplete="off" autofocus />
+    <div class="us-gate-error" id="us-gate-error" style="display:none;">Code incorrect.</div>
+    <button type="submit" class="us-btn us-gate-submit">Déverrouiller</button>
+  </form>
+</div>
 
 <div class="us-modal-overlay" id="us-welcome-overlay">
   <div class="us-modal-box">

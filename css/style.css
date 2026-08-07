@@ -8,6 +8,19 @@
 *{box-sizing:border-box;}
 body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--gray50);color:var(--gray800);}
 
+body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
+
+.us-gate-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;
+                  background:linear-gradient(120deg,#0B3F91 0%,#0D6FA3 55%,#00B3B8 100%);}
+.us-gate-box{background:#fff;border-radius:16px;padding:32px 30px;width:340px;max-width:100%;
+             box-shadow:0 24px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:6px;}
+.us-gate-title{font-family:var(--font-cond);font-size:20px;font-weight:800;color:#0B3F91;}
+.us-gate-sub{font-size:12.5px;color:#64748b;margin-bottom:14px;}
+.us-gate-input{padding:11px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;letter-spacing:1px;margin-bottom:6px;}
+.us-gate-input:focus{outline:none;border-color:#0B3F91;box-shadow:0 0 0 3px rgba(11,63,145,.12);}
+.us-gate-error{font-size:12px;color:#c2410c;font-weight:600;margin-bottom:10px;}
+.us-gate-submit{width:100%;padding:12px;}
+
 .us-modal-overlay{position:fixed;inset:0;background:rgba(7,44,90,.55);z-index:9998;
                    display:none;align-items:center;justify-content:center;padding:20px;}
 .us-modal-overlay.us-show{display:flex;}

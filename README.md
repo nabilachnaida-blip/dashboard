@@ -78,9 +78,28 @@ suivi.xlsx           Les données — à remplacer pour mettre à jour
 serve.bat            Lance un serveur local pour tester avant de pousser
 ```
 
+## Code d'accès
+
+Un écran demande un code (`AOUT2026`) avant d'afficher le dashboard. Le
+code est vérifié en comparant un hash SHA-256 calculé dans le navigateur —
+**ce n'est pas une vraie sécurité** : le code est trouvable en lisant le
+JavaScript (view-source), et `suivi.xlsx` reste téléchargeable directement
+via son URL même sans passer cet écran. Ça sert uniquement à décourager un
+visiteur qui tombe sur le lien par accident, pas à protéger des données
+sensibles. Pour une vraie protection, voir "Différences avec la version
+Flask" ci-dessous.
+
+Pour changer le code : recalcule le hash (`python -c "import hashlib;
+print(hashlib.sha256('TONCODE'.encode()).hexdigest())"`) et remplace
+`GATE_HASH` dans `js/dashboard.js`. Le déverrouillage est mémorisé par
+onglet/session (`sessionStorage`) — il est redemandé à la prochaine
+ouverture du navigateur.
+
 ## Différences avec la version Flask (Downloads/dashboard)
 
-- Pas de mot de passe, pas de connexion — si le dépôt est public, la page l'est aussi.
+- Le code d'accès ici est purement côté navigateur (voir ci-dessus) — la
+  version Flask a un vrai mot de passe côté serveur, seule protection
+  réelle des deux.
 - Pas de bouton "Importer" — la mise à jour se fait via `git push`.
 - Pas de "Renseigner la semaine prochaine" — rien n'est persisté côté
   serveur puisqu'il n'y a pas de serveur ; la semaine prochaine reste
