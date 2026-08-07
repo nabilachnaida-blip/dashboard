@@ -8,6 +8,7 @@
   var SHEET_ARRIVALS = "integration Usine";
   var SHEET_FORMATION_IFMIA = "En formation IFMIA";
   var SHEET_WEEKLY_INDICATORS = "Indicateurs Hebdomadaires";
+  var SHEET_PROBLEMATIQUES = "Problematiques";
   var ATELIER_MAP = { ferrage: "FERRAGE", montage: "MONTAGE", peinture: "PEINTURE" };
 
   var US_BLUE = "#0B3F91";
@@ -231,6 +232,28 @@
     return out;
   }
 
+  // Optional "Problematiques" sheet: a free-text description plus two
+  // drop-off percentages, entered by hand — key/value rows (col A / col B).
+  function parseProblematiques(rows) {
+    var result = { description: "", pct_visite_formation: null, pct_parcours_formation: null };
+    for (var i = 1; i < rows.length; i++) {
+      var rr = rows[i] || [];
+      var label = norm(rr[0]);
+      var val = rr[1];
+      if (!label) continue;
+      if (label.indexOf("description") !== -1) {
+        result.description = clean(val);
+      } else if (label.indexOf("visite") !== -1) {
+        var n1 = parseInt(val, 10);
+        if (!isNaN(n1)) result.pct_visite_formation = n1;
+      } else if (label.indexOf("parcours") !== -1) {
+        var n2 = parseInt(val, 10);
+        if (!isNaN(n2)) result.pct_parcours_formation = n2;
+      }
+    }
+    return result;
+  }
+
   function parseSuiviWorkbook(arrayBuffer) {
     var wb = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
     var missing = [SHEET_ARRIVALS, SHEET_WEEKLY_INDICATORS, SHEET_FORMATION_IFMIA].filter(function (s) {
@@ -250,12 +273,19 @@
     var ifmiaRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_FORMATION_IFMIA], { header: 1, raw: true, defval: null });
     var weekly = parseIndicateursHebdomadaires(wiRows, anchorYear);
 
+    var problematiques = { description: "", pct_visite_formation: null, pct_parcours_formation: null };
+    if (wb.SheetNames.indexOf(SHEET_PROBLEMATIQUES) !== -1) {
+      var probRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_PROBLEMATIQUES], { header: 1, raw: true, defval: null });
+      problematiques = parseProblematiques(probRows);
+    }
+
     return {
       arrivals: arrivals,
       formation_semaine: weekly.formation_semaine,
       formation_ifmia: parseFormationIfmiaTable(ifmiaRows),
       non_diplomes_grid: parseNonDiplomesGrid(ifmiaRows, anchorYear),
       manual_kpis: weekly.manual_kpis,
+      problematiques: problematiques,
     };
   }
 
@@ -393,6 +423,7 @@
       ifmia_diplomes_total: ifmiaDiplomesTotal,
       ifmia_non_diplomes_this_week: ifmiaNonDiplomesThisWeek,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
+      problematiques: parsed.problematiques,
     };
   }
 
@@ -572,6 +603,18 @@
     setKpiValue("us-kpi-visite", d.visite_this_week);
 
     renderFormationTable(d.formation.labels, d.formation.estimation, d.formation.reel);
+
+    var prob = d.problematiques;
+    var insightCard = document.getElementById("us-insight-card");
+    if (insightCard) {
+      var hasContent = prob && (prob.description || prob.pct_visite_formation !== null || prob.pct_parcours_formation !== null);
+      insightCard.style.display = hasContent ? "block" : "none";
+      if (hasContent) {
+        document.getElementById("us-insight-text").textContent = prob.description || "";
+        document.getElementById("us-insight-visite").textContent = prob.pct_visite_formation !== null ? prob.pct_visite_formation + "%" : "Non renseigné";
+        document.getElementById("us-insight-parcours").textContent = prob.pct_parcours_formation !== null ? prob.pct_parcours_formation + "%" : "Non renseigné";
+      }
+    }
 
     setTimeout(function () {
       buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);
