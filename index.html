@@ -66,7 +66,7 @@
       <div class="us-kpi-card us-c1">
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></div>
         <div class="us-kpi-body">
-          <div class="us-kpi-label">Entrées usine — <span id="us-this-week-label">cette semaine</span></div>
+          <div class="us-kpi-label">Arrivés usine — <span id="us-this-week-label">cette semaine</span></div>
           <div class="us-kpi-value" id="us-kpi-week">&mdash;</div>
           <div class="us-kpi-sub" id="us-kpi-week-sub"></div>
         </div>
@@ -116,7 +116,32 @@
       </div>
     </div>
 
-    <!-- Problématiques identifiées -->
+    
+
+     
+    <!-- Charts -->
+    <div class="us-charts-row">
+      <div class="us-chart-card">
+        <div class="us-chart-title">Nombre d'arrivés à l'usine par semaine/ global</div>
+        <div id="us-chart-weekly" class="us-chart"></div>
+      </div>
+      
+      <div class="us-detail-card">
+        <div class="us-chart-title">Task Force Mainstraim</div>
+        <div style="overflow-x:auto;">
+          <table class="us-detail-tbl">
+            <thead id="us-atelier-tbl-head"></thead>
+            <tbody id="us-atelier-tbl-body"></tbody>
+          </table>
+        </div>
+        <p class="us-table-note">NB : Ces chiffres correspondent au nombre réel d'intégrations enregistrées le jour J à l'usine, sans tenir compte des départs intervenus au cours de la période d'habilitation.</p>
+      </div>
+      <div class="us-chart-card">
+        <div class="us-chart-title">Formation — Estimation vs Réel par semaine</div>
+        <div id="us-chart-formation" class="us-chart"></div>
+      </div>
+
+      <!-- Problématiques identifiées -->
     <div class="us-insight-card" id="us-insight-card" style="display:none;">
       <div class="us-insight-header">
         <div class="us-insight-icon">
@@ -127,8 +152,7 @@
           <div class="us-insight-intro" id="us-insight-intro"></div>
         </div>
       </div>
-
-      <ul class="us-insight-reasons" id="us-insight-reasons"></ul>
+       <ul class="us-insight-reasons" id="us-insight-reasons"></ul>
 
       <div class="us-insight-stats">
         <div class="us-insight-stat">
@@ -148,27 +172,7 @@
       </div>
     </div>
 
-    <!-- Charts -->
-    <div class="us-charts-row">
-      <div class="us-chart-card">
-        <div class="us-chart-title">Nombre d'entrées usine par semaine</div>
-        <div id="us-chart-weekly" class="us-chart"></div>
-      </div>
-      
-      <div class="us-detail-card">
-        <div class="us-chart-title">Task Force Mainstrain</div>
-        <div style="overflow-x:auto;">
-          <table class="us-detail-tbl">
-            <thead id="us-atelier-tbl-head"></thead>
-            <tbody id="us-atelier-tbl-body"></tbody>
-          </table>
-        </div>
-        <p class="us-table-note">NB : Ces chiffres correspondent au nombre réel d'intégrations enregistrées le jour J à l'usine, sans tenir compte des départs intervenus au cours de la période d'habilitation.</p>
-      </div>
-      <div class="us-chart-card">
-        <div class="us-chart-title">Formation — Estimation vs Réel par semaine</div>
-        <div id="us-chart-formation" class="us-chart"></div>
-      </div>
+
       <div class="us-chart-card">
         <div class="us-chart-title">Contrats à venir par département</div>
         <div id="us-chart-upcoming" class="us-chart"></div>
@@ -177,7 +181,7 @@
         <div class="us-chart-title" id="us-july-title">Répartition par département</div>
         <div style="overflow-x:auto;">
           <table class="us-detail-tbl">
-            <thead><tr><th>Étiquettes de lignes</th><th>Somme de Effectifs</th></tr></thead>
+            <thead><tr><th>département</th><th>Somme de Effectifs</th></tr></thead>
             <tbody id="us-july-tbl-body"></tbody>
           </table>
         </div>
