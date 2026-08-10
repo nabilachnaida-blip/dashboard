@@ -112,6 +112,23 @@ body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
 .us-announce-item{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:500;}
 .us-announce-item strong{font-weight:800;color:#0B3F91;}
 
+/* Inline KPI editing */
+.us-edit-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+.us-kpi-value-row{display:flex;align-items:baseline;gap:8px;}
+.us-kpi-edit-btn{background:transparent;border:none;padding:4px;border-radius:6px;color:#94a3b8;cursor:pointer;display:flex;align-items:center;opacity:0;transition:opacity .12s ease,color .12s ease,background .12s ease;}
+.us-kpi-edit-btn svg{width:14px;height:14px;}
+.us-kpi-card:hover .us-kpi-edit-btn{opacity:1;}
+.us-kpi-edit-btn:hover{color:#0B3F91;background:#eff6ff;}
+
+.us-edit-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px;}
+.us-edit-modal{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:340px;box-shadow:0 20px 40px rgba(0,0,0,.25);}
+.us-edit-modal-title{font-size:16px;font-weight:800;color:#1e293b;font-family:var(--font-cond);margin-bottom:4px;}
+.us-edit-modal-week{font-size:12.5px;color:#64748b;font-weight:600;margin-bottom:14px;}
+.us-edit-modal-input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:10px;}
+.us-edit-modal-input:focus{outline:none;border-color:#0B3F91;}
+.us-edit-modal-error{font-size:12.5px;color:#c2410c;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+.us-edit-modal-actions{display:flex;justify-content:flex-end;gap:8px;}
+
 .us-insight-card{background:#fffbeb;border-radius:14px;padding:22px 26px;box-shadow:0 1px 3px rgba(0,0,0,.07);border:1px solid #fde68a;margin-bottom:20px;}
 
 .us-insight-header{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px;}

@@ -259,7 +259,10 @@
   }
 
   function parseSuiviWorkbook(arrayBuffer) {
-    var wb = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
+    return parseSuiviWorkbookData(XLSX.read(arrayBuffer, { type: "array", cellDates: true }));
+  }
+
+  function parseSuiviWorkbookData(wb) {
     var missing = [SHEET_ARRIVALS, SHEET_WEEKLY_INDICATORS, SHEET_FORMATION_IFMIA].filter(function (s) {
       return wb.SheetNames.indexOf(s) === -1;
     });
@@ -504,6 +507,9 @@
   // ── rendering ────────────────────────────────────────────────────────
   var US_CHARTS = {};
   var parsedWorkbook = null;
+  var rawWorkbook = null;
+  var lastRenderedWeekLabel = null;
+  var hasPendingEdits = false;
   var deptsLoaded = false;
   var weeksLoaded = false;
 
@@ -662,6 +668,7 @@
     populateDepartments(d.departments, d.selected_departement);
     populateWeeks(d.formation.labels);
 
+    lastRenderedWeekLabel = d.this_week_label || null;
     document.getElementById("us-this-week-label").textContent = d.this_week_label || "cette semaine";
     document.getElementById("us-kpi-week").textContent = fmt(d.this_week_total);
     document.getElementById("us-kpi-month").textContent = fmt(d.month_total);
@@ -747,6 +754,209 @@
     }, 50);
   }
 
+  // ── Inline KPI editing ──────────────────────────────────────────────
+  // Edits write directly into the in-memory workbook (rawWorkbook) and the
+  // dashboard re-renders immediately. Nothing is persisted anywhere until
+  // the user clicks "Télécharger" and re-uploads the file — there is no
+  // backend and no automatic write-back to the repo.
+  var EDIT_LABELS = {
+    appels: "Appels téléphoniques",
+    visite: "Visite médicale",
+    "non-diplomes": "En formation (non diplômés)",
+    "formation-ferrage": "En formation à IFMIA — Ferrage",
+    "formation-montage": "En formation à IFMIA — Montage",
+  };
+  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true };
+
+  function cellAddr(r, c) { return XLSX.utils.encode_cell({ r: r, c: c }); }
+
+  function setCell(ws, r, c, value, type) {
+    ws[cellAddr(r, c)] = { t: type, v: value };
+    var range = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : { s: { r: r, c: c }, e: { r: r, c: c } };
+    range.s.r = Math.min(range.s.r, r); range.s.c = Math.min(range.s.c, c);
+    range.e.r = Math.max(range.e.r, r); range.e.c = Math.max(range.e.c, c);
+    ws["!ref"] = XLSX.utils.encode_range(range);
+  }
+
+  function resolveEditTarget(kpiKey, weekLabel, dept) {
+    var weekNum = parseInt((weekLabel || "").replace(/^S/i, ""), 10);
+
+    if (kpiKey === "appels" || kpiKey === "visite") {
+      var ws = rawWorkbook.Sheets[SHEET_WEEKLY_INDICATORS];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+      var weekRow = -1, weekCols = {};
+      for (var r = 0; r < Math.min(rows.length, 5) && weekRow === -1; r++) {
+        var row = rows[r] || [], cols = {};
+        for (var c = 0; c < row.length; c++) {
+          var m = norm(row[c]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
+          if (m) cols[c] = parseInt(m[1], 10);
+        }
+        if (Object.keys(cols).length) { weekRow = r; weekCols = cols; }
+      }
+      if (weekRow === -1) return { ok: false, reason: "Grille des semaines introuvable dans 'Indicateurs Hebdomadaires'." };
+      var col = -1;
+      Object.keys(weekCols).forEach(function (c) { if (weekCols[c] === weekNum) col = Number(c); });
+      if (col === -1) return { ok: false, reason: "La semaine " + weekLabel + " n'existe pas dans le fichier." };
+
+      var targetRow = -1;
+      for (var i = weekRow + 1; i < rows.length; i++) {
+        var label = norm((rows[i] || [])[0]);
+        if (kpiKey === "appels" && label.indexOf("appel") !== -1) { targetRow = i; break; }
+        if (kpiKey === "visite" && label.indexOf("visite") !== -1 && label.indexOf("medic") !== -1) { targetRow = i; break; }
+      }
+      if (targetRow === -1) return { ok: false, reason: "Ligne introuvable dans 'Indicateurs Hebdomadaires'." };
+      return { ok: true, sheet: SHEET_WEEKLY_INDICATORS, row: targetRow, col: col };
+    }
+
+    if (kpiKey === "non-diplomes") {
+      var ws2 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
+      var rows2 = XLSX.utils.sheet_to_json(ws2, { header: 1, raw: true, defval: null });
+      var colOffset = 5;
+      var headerRow = -1, weekCols2 = {};
+      for (var r2 = 0; r2 < Math.min(rows2.length, 10) && headerRow === -1; r2++) {
+        if (norm((rows2[r2] || [])[colOffset]) === "ur") {
+          headerRow = r2;
+          var hr = rows2[r2] || [];
+          for (var c2 = colOffset + 1; c2 < hr.length; c2++) {
+            var m2 = norm(hr[c2]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
+            if (m2) weekCols2[c2] = parseInt(m2[1], 10);
+          }
+        }
+      }
+      if (headerRow === -1) return { ok: false, reason: "Grille non-diplômés introuvable." };
+      var col2 = -1;
+      Object.keys(weekCols2).forEach(function (c) { if (weekCols2[c] === weekNum) col2 = Number(c); });
+      if (col2 === -1) return { ok: false, reason: "La semaine " + weekLabel + " n'existe pas dans la grille non-diplômés." };
+
+      var urTarget = (dept || "TOTAL").toUpperCase();
+      var targetRow2 = -1;
+      var lastRow = headerRow;
+      for (var i2 = headerRow + 1; i2 < rows2.length; i2++) {
+        var urVal = clean((rows2[i2] || [])[colOffset]);
+        if (urVal) lastRow = i2;
+        if (urVal.toUpperCase() === urTarget) { targetRow2 = i2; break; }
+      }
+      if (targetRow2 === -1) {
+        targetRow2 = lastRow + 1;
+        return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: targetRow2, col: col2, ensureLabel: { col: colOffset, value: urTarget } };
+      }
+      return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: targetRow2, col: col2 };
+    }
+
+    if (kpiKey === "formation-ferrage" || kpiKey === "formation-montage") {
+      var urCode = kpiKey === "formation-ferrage" ? "FER" : "MON";
+      var ws3 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
+      var rows3 = XLSX.utils.sheet_to_json(ws3, { header: 1, raw: true, defval: null });
+      var headerRow3 = -1;
+      for (var r3 = 0; r3 < Math.min(rows3.length, 10); r3++) {
+        if (norm((rows3[r3] || [])[0]) === "ur") { headerRow3 = r3; break; }
+      }
+      if (headerRow3 === -1) return { ok: false, reason: "Tableau des diplômés introuvable." };
+      var matches = [];
+      for (var i3 = headerRow3 + 1; i3 < rows3.length; i3++) {
+        var ur3 = clean((rows3[i3] || [])[0]);
+        if (ur3.toUpperCase() === urCode) matches.push(i3);
+      }
+      if (matches.length !== 1) {
+        return { ok: false, reason: matches.length === 0
+          ? "Aucun lot " + urCode + " trouvé — ajoutez-le d'abord dans Excel."
+          : "Plusieurs lots " + urCode + " existent — modifiez le fichier Excel directement pour éviter toute ambiguïté." };
+      }
+      return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: matches[0], col: 1 };
+    }
+
+    return { ok: false, reason: "Champ non modifiable." };
+  }
+
+  function applyKpiEdit(kpiKey, weekLabel, dept, newValue) {
+    var target = resolveEditTarget(kpiKey, weekLabel, dept);
+    if (!target.ok) return target;
+    var ws = rawWorkbook.Sheets[target.sheet];
+    if (target.ensureLabel) setCell(ws, target.row, target.ensureLabel.col, target.ensureLabel.value, "s");
+    setCell(ws, target.row, target.col, newValue, "n");
+
+    parsedWorkbook = parseSuiviWorkbookData(rawWorkbook);
+    hasPendingEdits = true;
+    updateEditBar();
+    refresh();
+    return { ok: true };
+  }
+
+  function updateEditBar() {
+    var bar = document.getElementById("us-edit-bar");
+    if (bar) bar.style.display = hasPendingEdits ? "flex" : "none";
+  }
+
+  var currentEditKey = null;
+
+  window.usOpenEditModal = function (kpiKey) {
+    if (!rawWorkbook) return;
+    currentEditKey = kpiKey;
+    var weekLabel = lastRenderedWeekLabel || "S" + isoWeekInfo(todayUTC()).isoWeek;
+    var dept = (document.getElementById("us-dept-select") || {}).value || "";
+    var weekScoped = !!WEEK_SCOPED_EDIT[kpiKey];
+
+    document.getElementById("us-edit-modal-title").textContent = EDIT_LABELS[kpiKey] || "Modifier";
+    var weekEl = document.getElementById("us-edit-modal-week");
+    weekEl.style.display = weekScoped ? "" : "none";
+    weekEl.textContent = weekScoped ? "Semaine " + weekLabel : "";
+
+    var target = resolveEditTarget(kpiKey, weekLabel, dept);
+    var errEl = document.getElementById("us-edit-modal-error");
+    var input = document.getElementById("us-edit-modal-input");
+    if (!target.ok) {
+      errEl.style.display = "block";
+      errEl.textContent = target.reason;
+      input.style.display = "none";
+    } else {
+      errEl.style.display = "none";
+      input.style.display = "";
+      var ws = rawWorkbook.Sheets[target.sheet];
+      var cell = ws[cellAddr(target.row, target.col)];
+      input.value = cell && typeof cell.v === "number" ? cell.v : "";
+    }
+    document.getElementById("us-edit-modal-overlay").style.display = "flex";
+    if (target.ok) input.focus();
+  };
+
+  window.usCloseEditModal = function () {
+    document.getElementById("us-edit-modal-overlay").style.display = "none";
+    currentEditKey = null;
+  };
+
+  window.usSaveEditModal = function () {
+    var input = document.getElementById("us-edit-modal-input");
+    var val = parseInt(input.value, 10);
+    var errEl = document.getElementById("us-edit-modal-error");
+    if (isNaN(val) || val < 0) {
+      errEl.style.display = "block";
+      errEl.textContent = "Merci d'entrer un nombre valide (≥ 0).";
+      return;
+    }
+    var weekLabel = lastRenderedWeekLabel || "S" + isoWeekInfo(todayUTC()).isoWeek;
+    var dept = (document.getElementById("us-dept-select") || {}).value || "";
+    var result = applyKpiEdit(currentEditKey, weekLabel, dept, val);
+    if (!result.ok) {
+      errEl.style.display = "block";
+      errEl.textContent = result.reason;
+      return;
+    }
+    window.usCloseEditModal();
+  };
+
+  window.usDownloadUpdatedWorkbook = function () {
+    if (!rawWorkbook) return;
+    var out = XLSX.write(rawWorkbook, { bookType: "xlsx", type: "array" });
+    var blob = new Blob([out], { type: "application/octet-stream" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "suivi.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   function refresh() {
     if (!parsedWorkbook) return;
     var errEl = document.getElementById("us-error");
@@ -790,7 +1000,8 @@
         return r.arrayBuffer();
       })
       .then(function (buf) {
-        parsedWorkbook = parseSuiviWorkbook(buf);
+        rawWorkbook = XLSX.read(buf, { type: "array", cellDates: true });
+        parsedWorkbook = parseSuiviWorkbookData(rawWorkbook);
         refresh();
       })
       .catch(function (e) {

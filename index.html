@@ -71,6 +71,12 @@
       <button class="us-btn us-btn-ghost" onclick="usResetFilters()">Réinitialiser</button>
     </div>
 
+    <!-- Pending-edits bar -->
+    <div class="us-edit-bar" id="us-edit-bar" style="display:none;">
+      <span>Modifications non enregistrées — téléchargez le fichier puis remplacez-le sur GitHub pour les conserver.</span>
+      <button type="button" class="us-btn" onclick="usDownloadUpdatedWorkbook()">Télécharger suivi.xlsx mis à jour</button>
+    </div>
+
     <!-- KPIs -->
     <div class="us-kpi-grid">
       <div class="us-kpi-card us-c1">
@@ -99,21 +105,36 @@
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
         <div class="us-kpi-body">
           <div class="us-kpi-label">En formation à IFMIA — Ferrage</div>
-          <div class="us-kpi-value" id="us-kpi-formation-ferrage">&mdash;</div>
+          <div class="us-kpi-value-row">
+            <div class="us-kpi-value" id="us-kpi-formation-ferrage">&mdash;</div>
+            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('formation-ferrage')" title="Modifier cette valeur">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
         </div>
       </div>
       <div class="us-kpi-card us-c9">
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
         <div class="us-kpi-body">
           <div class="us-kpi-label">En formation à IFMIA — Montage</div>
-          <div class="us-kpi-value" id="us-kpi-formation-montage">&mdash;</div>
+          <div class="us-kpi-value-row">
+            <div class="us-kpi-value" id="us-kpi-formation-montage">&mdash;</div>
+            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('formation-montage')" title="Modifier cette valeur">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
         </div>
       </div>
       <div class="us-kpi-card us-c4">
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg></div>
         <div class="us-kpi-body">
           <div class="us-kpi-label">En formation (non diplômés) — <span id="us-ifmia-nondip-week-label">cette semaine</span></div>
-          <div class="us-kpi-value" id="us-kpi-next-week">&mdash;</div>
+          <div class="us-kpi-value-row">
+            <div class="us-kpi-value" id="us-kpi-next-week">&mdash;</div>
+            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('non-diplomes')" title="Modifier cette valeur">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
         </div>
       </div>
       <div class="us-kpi-card us-c5">
@@ -128,14 +149,24 @@
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
         <div class="us-kpi-body">
           <div class="us-kpi-label">Appels téléphoniques — <span id="us-appels-week-label">cette semaine</span></div>
-          <div class="us-kpi-value" id="us-kpi-appels">&mdash;</div>
+          <div class="us-kpi-value-row">
+            <div class="us-kpi-value" id="us-kpi-appels">&mdash;</div>
+            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('appels')" title="Modifier cette valeur">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
         </div>
       </div>
       <div class="us-kpi-card us-c7">
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
         <div class="us-kpi-body">
           <div class="us-kpi-label">Visite médicale — <span id="us-visite-week-label">cette semaine</span></div>
-          <div class="us-kpi-value" id="us-kpi-visite">&mdash;</div>
+          <div class="us-kpi-value-row">
+            <div class="us-kpi-value" id="us-kpi-visite">&mdash;</div>
+            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('visite')" title="Modifier cette valeur">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -218,6 +249,20 @@
 
   </div>
 </main>
+
+<!-- Edit KPI modal -->
+<div class="us-edit-modal-overlay" id="us-edit-modal-overlay" style="display:none;">
+  <div class="us-edit-modal">
+    <div class="us-edit-modal-title" id="us-edit-modal-title">Modifier</div>
+    <div class="us-edit-modal-week" id="us-edit-modal-week"></div>
+    <input type="number" id="us-edit-modal-input" class="us-edit-modal-input" min="0" placeholder="Valeur">
+    <div class="us-edit-modal-error" id="us-edit-modal-error" style="display:none;"></div>
+    <div class="us-edit-modal-actions">
+      <button type="button" class="us-btn us-btn-ghost" onclick="usCloseEditModal()">Annuler</button>
+      <button type="button" class="us-btn" onclick="usSaveEditModal()">Enregistrer</button>
+    </div>
+  </div>
+</div>
 
 <script src="js/dashboard.js"></script>
 </body>
