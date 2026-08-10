@@ -487,19 +487,24 @@
     var ifmiaDipRows = parsed.formation_ifmia || [];
     if (depParam) ifmiaDipRows = ifmiaDipRows.filter(function (i) { return i.ur === depParam; });
     var ifmiaDipThisWeek = ifmiaDipRows.filter(function (r) { return r.iso_year === cur.isoYear && r.iso_week === cur.isoWeek; });
-    var ifmiaDiplomesTotal = null;
     var ifmiaFerrageTotal = null, ifmiaMontageTotal = null;
-    if (ifmiaDipThisWeek.length) {
-      ifmiaDiplomesTotal = 0;
-      var ferSum = 0, ferHas = false, monSum = 0, monHas = false;
-      ifmiaDipThisWeek.forEach(function (i) {
-        ifmiaDiplomesTotal += i.effectif;
-        if (i.ur === "FER") { ferSum += i.effectif; ferHas = true; }
-        else if (i.ur === "MON") { monSum += i.effectif; monHas = true; }
-      });
-      ifmiaFerrageTotal = ferHas ? ferSum : null;
-      ifmiaMontageTotal = monHas ? monSum : null;
-    }
+    var ferHas = false, monHas = false;
+    ifmiaDipThisWeek.forEach(function (i) {
+      if (i.ur === "FER") { ifmiaFerrageTotal = (ifmiaFerrageTotal || 0) + i.effectif; ferHas = true; }
+      else if (i.ur === "MON") { ifmiaMontageTotal = (ifmiaMontageTotal || 0) + i.effectif; monHas = true; }
+    });
+    if (!ferHas) ifmiaFerrageTotal = null;
+    if (!monHas) ifmiaMontageTotal = null;
+
+    // Total à IFMIA is its own manually-entered "TOTAL" row (not the sum
+    // of Ferrage + Montage + other lots) — plant-wide, so not filtered by
+    // département, same as Appels/Visite/Départ IFMIA.
+    var ifmiaDiplomesTotal = null;
+    (parsed.formation_ifmia || []).forEach(function (r) {
+      if (r.ur === "TOTAL" && r.iso_year === cur.isoYear && r.iso_week === cur.isoWeek) {
+        ifmiaDiplomesTotal = r.effectif;
+      }
+    });
 
     // Non-diplômés — sum across departments (or just the selected one) for
     // the current week, from the UR × semaine grid.
@@ -834,9 +839,10 @@
     "non-diplomes": "En formation (non diplômés)",
     "formation-ferrage": "En formation à IFMIA — Ferrage",
     "formation-montage": "En formation à IFMIA — Montage",
+    "formation-total": "En formation total à IFMIA",
     "depart-ifmia": "Départ IFMIA",
   };
-  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true, "depart-ifmia": true, "formation-ferrage": true, "formation-montage": true };
+  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true, "depart-ifmia": true, "formation-ferrage": true, "formation-montage": true, "formation-total": true };
 
   function cellAddr(r, c) { return XLSX.utils.encode_cell({ r: r, c: c }); }
 
@@ -905,8 +911,8 @@
       return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: targetRow2, col: col2 };
     }
 
-    if (kpiKey === "formation-ferrage" || kpiKey === "formation-montage") {
-      var urCode = kpiKey === "formation-ferrage" ? "FER" : "MON";
+    if (kpiKey === "formation-ferrage" || kpiKey === "formation-montage" || kpiKey === "formation-total") {
+      var urCode = kpiKey === "formation-ferrage" ? "FER" : kpiKey === "formation-montage" ? "MON" : "TOTAL";
       var ws3 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
       var rows3 = sheetRows(ws3);
       var dipColOffset = 0; // column A, 0-indexed — see parseFormationIfmiaGrid
