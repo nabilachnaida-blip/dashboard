@@ -16,6 +16,21 @@
   var US_ORANGE = "#FF5A1F";
   var US_CAT_COLORS = ["#0B3F91", "#0D6FA3", "#00B3B8", "#38D6C4", "#6EE7D2", "#9FEDE2", "#FF5A1F", "#4DA8DA"];
 
+  // Reads a sheet into a row-array where index i is ALWAYS actual sheet
+  // row i (0-indexed), matching XLSX.utils.encode_cell({r: i, ...}). Plain
+  // sheet_to_json indexes from the sheet's used-range start instead (e.g.
+  // row 0 of the array is row 4 of the sheet if rows 1-3 are empty), which
+  // silently breaks every row/col computed elsewhere in this file — always
+  // read sheets through this helper, never call sheet_to_json directly.
+  function sheetRows(ws) {
+    if (!ws) return [];
+    var range = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
+    return XLSX.utils.sheet_to_json(ws, {
+      header: 1, raw: true, defval: null,
+      range: { s: { r: 0, c: 0 }, e: range.e },
+    });
+  }
+
   // ── text helpers ─────────────────────────────────────────────────────
   function clean(v) { return v === null || v === undefined ? "" : String(v).trim(); }
   function norm(v) {
@@ -181,42 +196,32 @@
     };
   }
 
-  // Diplômés table (col A: UR/Effectifs/Date IFMIA/Date Usine).
-  function parseFormationIfmiaTable(rows) {
-    var headerRow = -1;
+  // Locates a "UR" header cell at colOffset and the S30..S40 week columns
+  // right after it — bounded to exactly 11 columns so it never picks up
+  // headers from a second grid sitting further right on the same row (the
+  // diplômés and non-diplômés grids share rows in "En formation IFMIA").
+  function findUrWeekHeader(rows, colOffset) {
     for (var r = 0; r < Math.min(rows.length, 10); r++) {
-      if (norm((rows[r] || [])[0]) === "ur") { headerRow = r; break; }
-    }
-    if (headerRow === -1) return [];
-    var out = [];
-    for (var i = headerRow + 1; i < rows.length; i++) {
-      var rr = rows[i] || [];
-      var ur = rr[0], eff = rr[1];
-      if (!clean(ur) || eff === null || eff === undefined || eff === "") continue;
-      var dateIfmia = parseDate(rr[2]), dateUsine = parseDate(rr[3]);
-      if (!dateIfmia) continue;
-      var effInt = parseInt(eff, 10);
-      if (isNaN(effInt)) continue;
-      out.push({ ur: clean(ur), effectif: effInt, date_integration_ifmia: dateIfmia, date_integration_usine: dateUsine });
-    }
-    return out;
-  }
-
-  // Non-diplômés grid (col F onward: UR row × S30/S31/... week columns) —
-  // one row per department, values entered by hand per week.
-  function parseNonDiplomesGrid(rows, anchorYear) {
-    var colOffset = 5; // column F, 0-indexed
-    var headerRow = -1, weekCols = {};
-    for (var r = 0; r < Math.min(rows.length, 10) && headerRow === -1; r++) {
       if (norm((rows[r] || [])[colOffset]) === "ur") {
-        headerRow = r;
+        var weekCols = {};
         var row = rows[r] || [];
-        for (var c = colOffset + 1; c < row.length; c++) {
+        for (var c = colOffset + 1; c <= colOffset + 11; c++) {
           var m = norm(row[c]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
           if (m) weekCols[c] = parseInt(m[1], 10);
         }
+        return { headerRow: r, weekCols: weekCols };
       }
     }
+    return { headerRow: -1, weekCols: {} };
+  }
+
+  // Generic UR × semaine grid parser — the "En formation IFMIA" sheet has
+  // two side-by-side grids of this exact shape: diplômés at column A, and
+  // non-diplômés at column N (shifted right to make room). Each week is
+  // its own column so historical weeks are never overwritten.
+  function parseUrWeekGrid(rows, anchorYear, colOffset) {
+    var header = findUrWeekHeader(rows, colOffset);
+    var headerRow = header.headerRow, weekCols = header.weekCols;
     if (headerRow === -1) return [];
 
     var out = [];
@@ -234,6 +239,14 @@
       });
     }
     return out;
+  }
+
+  function parseFormationIfmiaGrid(rows, anchorYear) {
+    return parseUrWeekGrid(rows, anchorYear, 0); // column A, 0-indexed
+  }
+
+  function parseNonDiplomesGrid(rows, anchorYear) {
+    return parseUrWeekGrid(rows, anchorYear, 13); // column N, 0-indexed
   }
 
   // Optional "Problematiques" sheet: an intro line, a numbered list of
@@ -290,7 +303,7 @@
     });
     if (missing.length) throw new Error("Feuille(s) manquante(s) dans le classeur : " + missing.join(", "));
 
-    var arrivalsRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_ARRIVALS], { header: 1, raw: true, defval: null });
+    var arrivalsRows = sheetRows(wb.Sheets[SHEET_ARRIVALS]);
     var arrivals = parseArrivals(arrivalsRows);
     if (!arrivals.length) throw new Error("Aucune donnée exploitable dans la feuille '" + SHEET_ARRIVALS + "'");
 
@@ -298,19 +311,19 @@
     arrivals.forEach(function (a) { if (a.date_arrivee_usine < minDate) minDate = a.date_arrivee_usine; });
     var anchorYear = isoWeekInfo(minDate).isoYear;
 
-    var wiRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_WEEKLY_INDICATORS], { header: 1, raw: true, defval: null });
-    var ifmiaRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_FORMATION_IFMIA], { header: 1, raw: true, defval: null });
+    var wiRows = sheetRows(wb.Sheets[SHEET_WEEKLY_INDICATORS]);
+    var ifmiaRows = sheetRows(wb.Sheets[SHEET_FORMATION_IFMIA]);
     var weekly = parseIndicateursHebdomadaires(wiRows, anchorYear);
 
     var problematiques = { intro: "", reasons: [], pct_visite_formation: null, pct_parcours_formation: null };
     if (wb.SheetNames.indexOf(SHEET_PROBLEMATIQUES) !== -1) {
-      var probRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_PROBLEMATIQUES], { header: 1, raw: true, defval: null });
+      var probRows = sheetRows(wb.Sheets[SHEET_PROBLEMATIQUES]);
       problematiques = parseProblematiques(probRows);
     }
 
     var arriveesPrevues = [];
     if (wb.SheetNames.indexOf(SHEET_ARRIVEES_PREVUES) !== -1) {
-      var apRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_ARRIVEES_PREVUES], { header: 1, raw: true, defval: null });
+      var apRows = sheetRows(wb.Sheets[SHEET_ARRIVEES_PREVUES]);
       arriveesPrevues = parseArriveesPrevues(apRows);
     }
 
@@ -318,7 +331,7 @@
       arrivals: arrivals,
       anchor_year: anchorYear,
       formation_semaine: weekly.formation_semaine,
-      formation_ifmia: parseFormationIfmiaTable(ifmiaRows),
+      formation_ifmia: parseFormationIfmiaGrid(ifmiaRows, anchorYear),
       non_diplomes_grid: parseNonDiplomesGrid(ifmiaRows, anchorYear),
       manual_kpis: weekly.manual_kpis,
       problematiques: problematiques,
@@ -339,12 +352,17 @@
 
     var scopeCodes = depParam ? [depParam] : presentCodes;
 
-    var arrivals = parsed.arrivals.filter(function (a) { return scopeCodes.indexOf(a.departement) !== -1; });
+    // Department-scoped but NOT narrowed by the Semaine filter — used for
+    // the trend charts (weekly arrivals, atelier Réel), which must always
+    // show every week regardless of which week is currently selected.
+    var arrivalsAllWeeks = parsed.arrivals.filter(function (a) { return scopeCodes.indexOf(a.departement) !== -1; });
+
+    var arrivals = arrivalsAllWeeks;
     if (dateFrom) arrivals = arrivals.filter(function (a) { return a.date_arrivee_usine >= dateFrom; });
     if (dateTo) arrivals = arrivals.filter(function (a) { return a.date_arrivee_usine <= dateTo; });
 
     var minRelevantDate = null;
-    if (!dateFrom && parsed.formation_semaine.length) {
+    if (parsed.formation_semaine.length) {
       var earliest = parsed.formation_semaine.reduce(function (acc, r) {
         if (!acc) return r;
         return (r.iso_year < acc.iso_year || (r.iso_year === acc.iso_year && r.iso_week < acc.iso_week)) ? r : acc;
@@ -353,7 +371,7 @@
     }
 
     var weekly = {};
-    arrivals.forEach(function (a) {
+    arrivalsAllWeeks.forEach(function (a) {
       if (minRelevantDate && a.date_arrivee_usine < minRelevantDate) return;
       var info = isoWeekInfo(a.date_arrivee_usine);
       var key = info.isoYear + "_" + info.isoWeek;
@@ -398,10 +416,11 @@
     // Réel per atelier/semaine is calculated live from the "integration
     // Usine" arrivals (matched by département FER/MON/PEI) — never typed
     // by hand. Estimation stays the manually-entered plan from Indicateurs
-    // Hebdomadaires.
+    // Hebdomadaires. Uses arrivalsAllWeeks so the Task Force table and the
+    // Formation chart always show every week, unaffected by the Semaine filter.
     var ATELIER_DEPT = { FERRAGE: "FER", MONTAGE: "MON", PEINTURE: "PEI" };
     var arrivalsByAtelierWeek = {};
-    arrivals.forEach(function (a) {
+    arrivalsAllWeeks.forEach(function (a) {
       var atelier = null;
       Object.keys(ATELIER_DEPT).forEach(function (k) { if (ATELIER_DEPT[k] === a.departement) atelier = k; });
       if (!atelier) return;
@@ -433,9 +452,14 @@
     var formationEstimation = fsSorted.map(function (w) { return w.estimation; });
     var formationReel = fsSorted.map(function (w) { return w.reel; });
 
+    // Habilitation — contrats à venir. Always computed from the full
+    // arrivals table (department-scoped only), never from the
+    // Semaine-filtered subset: it answers "who has a contract starting
+    // soon", which has nothing to do with which arrival week is browsed.
     var upcomingByDept = {};
-    arrivals.forEach(function (a) {
-      if (a.date_debut_contrat && a.date_debut_contrat > refPoint) {
+    parsed.arrivals.forEach(function (a) {
+      if (scopeCodes.indexOf(a.departement) === -1) return;
+      if (a.date_debut_contrat && a.date_debut_contrat > today) {
         upcomingByDept[a.departement] = (upcomingByDept[a.departement] || 0) + a.effectif;
       }
     });
@@ -457,16 +481,18 @@
     var julyDeptList = Object.keys(julyDeptSums).sort().map(function (d) { return { departement: d, effectif: julyDeptSums[d] }; });
     var julyDeptTotal = julyDeptList.reduce(function (s, r) { return s + r.effectif; }, 0);
 
-    // Diplômés — total headcount from the arrival table (department-scoped),
-    // not week-specific: just the running total of everyone tracked.
-    var ifmiaDip = parsed.formation_ifmia;
-    if (depParam) ifmiaDip = ifmiaDip.filter(function (i) { return i.ur === depParam; });
+    // Diplômés — from the UR × semaine grid, scoped to the currently
+    // viewed week (same historique pattern as the other weekly cards):
+    // each week is its own column, so past weeks are never overwritten.
+    var ifmiaDipRows = parsed.formation_ifmia || [];
+    if (depParam) ifmiaDipRows = ifmiaDipRows.filter(function (i) { return i.ur === depParam; });
+    var ifmiaDipThisWeek = ifmiaDipRows.filter(function (r) { return r.iso_year === cur.isoYear && r.iso_week === cur.isoWeek; });
     var ifmiaDiplomesTotal = null;
     var ifmiaFerrageTotal = null, ifmiaMontageTotal = null;
-    if (ifmiaDip.length) {
+    if (ifmiaDipThisWeek.length) {
       ifmiaDiplomesTotal = 0;
       var ferSum = 0, ferHas = false, monSum = 0, monHas = false;
-      ifmiaDip.forEach(function (i) {
+      ifmiaDipThisWeek.forEach(function (i) {
         ifmiaDiplomesTotal += i.effectif;
         if (i.ur === "FER") { ferSum += i.effectif; ferHas = true; }
         else if (i.ur === "MON") { monSum += i.effectif; monHas = true; }
@@ -494,12 +520,11 @@
     var departIfmiaThisWeek = manualEntry && manualEntry.depart_ifmia !== null ? manualEntry.depart_ifmia : null;
 
     // Arrivées prévues — a hand-maintained list of upcoming arrivals (see
-    // the "Arrivees Prevues" sheet), shown until their date has passed.
-    // Uses the start of the selected week (not its Sunday like refPoint)
-    // so entries dated earlier in that same week still show.
-    var announceRefPoint = dateFrom || today;
+    // the "Arrivees Prevues" sheet). Always shown regardless of the
+    // département/semaine filters — only expires against the real
+    // "today", never against whatever filter is currently selected.
     var upcomingIntegrations = (parsed.arrivees_prevues || [])
-      .filter(function (r) { return r.date >= announceRefPoint; })
+      .filter(function (r) { return r.date >= today; })
       .map(function (r) { return { date_label: fmtDateFr(r.date), categorie: r.categorie, value: r.valeur, row: r.row }; });
 
     return {
@@ -709,8 +734,11 @@
     document.getElementById("us-kpi-month-label").textContent = d.month_label || "";
     document.getElementById("us-kpi-upcoming").textContent = fmt(d.upcoming_contracts.total);
 
+    document.getElementById("us-formation-total-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-formation", d.ifmia_diplomes_total);
+    document.getElementById("us-formation-ferrage-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-formation-ferrage", d.ifmia_ferrage_total);
+    document.getElementById("us-formation-montage-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-formation-montage", d.ifmia_montage_total);
     document.getElementById("us-ifmia-nondip-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-next-week", d.ifmia_non_diplomes_this_week);
@@ -808,7 +836,7 @@
     "formation-montage": "En formation à IFMIA — Montage",
     "depart-ifmia": "Départ IFMIA",
   };
-  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true, "depart-ifmia": true };
+  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true, "depart-ifmia": true, "formation-ferrage": true, "formation-montage": true };
 
   function cellAddr(r, c) { return XLSX.utils.encode_cell({ r: r, c: c }); }
 
@@ -825,7 +853,7 @@
 
     if (kpiKey === "appels" || kpiKey === "visite" || kpiKey === "depart-ifmia") {
       var ws = rawWorkbook.Sheets[SHEET_WEEKLY_INDICATORS];
-      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+      var rows = sheetRows(ws);
       var weekRow = -1, weekCols = {};
       for (var r = 0; r < Math.min(rows.length, 5) && weekRow === -1; r++) {
         var row = rows[r] || [], cols = {};
@@ -853,19 +881,10 @@
 
     if (kpiKey === "non-diplomes") {
       var ws2 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
-      var rows2 = XLSX.utils.sheet_to_json(ws2, { header: 1, raw: true, defval: null });
-      var colOffset = 5;
-      var headerRow = -1, weekCols2 = {};
-      for (var r2 = 0; r2 < Math.min(rows2.length, 10) && headerRow === -1; r2++) {
-        if (norm((rows2[r2] || [])[colOffset]) === "ur") {
-          headerRow = r2;
-          var hr = rows2[r2] || [];
-          for (var c2 = colOffset + 1; c2 < hr.length; c2++) {
-            var m2 = norm(hr[c2]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
-            if (m2) weekCols2[c2] = parseInt(m2[1], 10);
-          }
-        }
-      }
+      var rows2 = sheetRows(ws2);
+      var colOffset = 13; // column N, 0-indexed — see parseNonDiplomesGrid
+      var header2 = findUrWeekHeader(rows2, colOffset);
+      var headerRow = header2.headerRow, weekCols2 = header2.weekCols;
       if (headerRow === -1) return { ok: false, reason: "Grille non-diplômés introuvable." };
       var col2 = -1;
       Object.keys(weekCols2).forEach(function (c) { if (weekCols2[c] === weekNum) col2 = Number(c); });
@@ -889,23 +908,27 @@
     if (kpiKey === "formation-ferrage" || kpiKey === "formation-montage") {
       var urCode = kpiKey === "formation-ferrage" ? "FER" : "MON";
       var ws3 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
-      var rows3 = XLSX.utils.sheet_to_json(ws3, { header: 1, raw: true, defval: null });
-      var headerRow3 = -1;
-      for (var r3 = 0; r3 < Math.min(rows3.length, 10); r3++) {
-        if (norm((rows3[r3] || [])[0]) === "ur") { headerRow3 = r3; break; }
-      }
+      var rows3 = sheetRows(ws3);
+      var dipColOffset = 0; // column A, 0-indexed — see parseFormationIfmiaGrid
+      var header3 = findUrWeekHeader(rows3, dipColOffset);
+      var headerRow3 = header3.headerRow, weekCols3 = header3.weekCols;
       if (headerRow3 === -1) return { ok: false, reason: "Tableau des diplômés introuvable." };
-      var matches = [];
+      var col3 = -1;
+      Object.keys(weekCols3).forEach(function (c) { if (weekCols3[c] === weekNum) col3 = Number(c); });
+      if (col3 === -1) return { ok: false, reason: "La semaine " + weekLabel + " n'existe pas dans le tableau des diplômés." };
+
+      var targetRow3 = -1;
+      var lastRow3 = headerRow3;
       for (var i3 = headerRow3 + 1; i3 < rows3.length; i3++) {
-        var ur3 = clean((rows3[i3] || [])[0]);
-        if (ur3.toUpperCase() === urCode) matches.push(i3);
+        var ur3 = clean((rows3[i3] || [])[dipColOffset]);
+        if (ur3) lastRow3 = i3;
+        if (ur3.toUpperCase() === urCode) { targetRow3 = i3; break; }
       }
-      if (matches.length !== 1) {
-        return { ok: false, reason: matches.length === 0
-          ? "Aucun lot " + urCode + " trouvé — ajoutez-le d'abord dans Excel."
-          : "Plusieurs lots " + urCode + " existent — modifiez le fichier Excel directement pour éviter toute ambiguïté." };
+      if (targetRow3 === -1) {
+        targetRow3 = lastRow3 + 1;
+        return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: targetRow3, col: col3, ensureLabel: { col: dipColOffset, value: urCode } };
       }
-      return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: matches[0], col: 1 };
+      return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: targetRow3, col: col3 };
     }
 
     return { ok: false, reason: "Champ non modifiable." };
