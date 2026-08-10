@@ -75,6 +75,7 @@ body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
 .us-kpi-card.us-c7::before,.us-kpi-card.us-c7::after{background:#9333ea;}
 .us-kpi-card.us-c8::before,.us-kpi-card.us-c8::after{background:#db2777;}
 .us-kpi-card.us-c9::before,.us-kpi-card.us-c9::after{background:#0891b2;}
+.us-kpi-card.us-c10::before,.us-kpi-card.us-c10::after{background:#b91c1c;}
 
 .us-kpi-card.us-c1 .us-kpi-icon{background:rgba(11,63,145,.10);color:#0B3F91;}
 .us-kpi-card.us-c2 .us-kpi-icon{background:rgba(0,179,184,.12);color:#00838a;}
@@ -85,6 +86,7 @@ body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
 .us-kpi-card.us-c7 .us-kpi-icon{background:rgba(147,51,234,.10);color:#9333ea;}
 .us-kpi-card.us-c8 .us-kpi-icon{background:rgba(219,39,119,.10);color:#db2777;}
 .us-kpi-card.us-c9 .us-kpi-icon{background:rgba(8,145,178,.10);color:#0891b2;}
+.us-kpi-card.us-c10 .us-kpi-icon{background:rgba(185,28,28,.10);color:#b91c1c;}
 
 .us-kpi-label{font-size:11.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
 .us-kpi-value{font-size:28px;font-weight:800;font-family:var(--font-cond);color:#1e293b;line-height:1.1;}
@@ -109,12 +111,16 @@ body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
 
 .us-announce-card{margin-bottom:20px;}
 .us-announce-list{display:flex;flex-wrap:wrap;gap:10px;}
-.us-announce-item{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:500;}
+.us-announce-item{display:flex;align-items:center;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:500;}
 .us-announce-item strong{font-weight:800;color:#0B3F91;}
+.us-announce-edit-btn{background:transparent;border:none;padding:3px;border-radius:6px;color:#60a5fa;cursor:pointer;display:flex;align-items:center;flex-shrink:0;}
+.us-announce-edit-btn svg{width:13px;height:13px;}
+.us-announce-edit-btn:hover{color:#0B3F91;background:rgba(11,63,145,.08);}
 
-/* Inline KPI editing — temporarily hidden; feature code stays intact. */
-.us-kpi-edit-btn,.us-edit-bar{display:none !important;}
-.us-edit-bar{align-items:center;justify-content:space-between;gap:14px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+/* KPI-card inline editing stays hidden for now; the Arrivées prévues
+   editing (and its "Télécharger" bar below) is active. */
+.us-kpi-edit-btn{display:none !important;}
+.us-edit-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600;flex-wrap:wrap;}
 .us-kpi-value-row{display:flex;align-items:baseline;gap:8px;}
 .us-kpi-edit-btn{background:transparent;border:none;padding:4px;border-radius:6px;color:#94a3b8;cursor:pointer;display:flex;align-items:center;opacity:0;transition:opacity .12s ease,color .12s ease,background .12s ease;}
 .us-kpi-edit-btn svg{width:14px;height:14px;}
@@ -172,6 +178,7 @@ body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
 .us-kpi-card:nth-child(8){animation-delay:.30s;}
 .us-kpi-card:nth-child(9){animation-delay:.34s;}
 .us-kpi-card:nth-child(10){animation-delay:.38s;}
+.us-kpi-card:nth-child(11){animation-delay:.42s;}
 
 @media(max-width:900px){
   .us-hero{flex-direction:column;align-items:flex-start;}

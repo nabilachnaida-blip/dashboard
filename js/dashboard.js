@@ -9,6 +9,7 @@
   var SHEET_FORMATION_IFMIA = "En formation IFMIA";
   var SHEET_WEEKLY_INDICATORS = "Indicateurs Hebdomadaires";
   var SHEET_PROBLEMATIQUES = "Problematiques";
+  var SHEET_ARRIVEES_PREVUES = "Arrivees Prevues";
   var ATELIER_MAP = { ferrage: "FERRAGE", montage: "MONTAGE", peinture: "PEINTURE" };
 
   var US_BLUE = "#0B3F91";
@@ -129,6 +130,7 @@
           iso_year: anchorYear, iso_week: week,
           appels: null, visite: null,
           ifmia_diplomes: null, ifmia_non_diplomes: null,
+          depart_ifmia: null,
         };
       }
       return manualByWeek[key];
@@ -152,6 +154,8 @@
         manualField = "appels";
       } else if (label.indexOf("visite") !== -1 && label.indexOf("medic") !== -1) {
         manualField = "visite";
+      } else if (label.indexOf("depart") !== -1 && label.indexOf("ifmia") !== -1) {
+        manualField = "depart_ifmia";
       }
       if (!kind && !manualField) continue;
 
@@ -258,6 +262,24 @@
     return result;
   }
 
+  // Optional "Arrivees Prevues" sheet: a hand-maintained list of upcoming
+  // arrivals not yet reflected in the IFMIA/arrivals tables — one row per
+  // announcement (Date / Categorie / Valeur).
+  function parseArriveesPrevues(rows) {
+    var out = [];
+    for (var i = 1; i < rows.length; i++) {
+      var rr = rows[i] || [];
+      var date = parseDate(rr[0]);
+      var categorie = clean(rr[1]);
+      var valeur = rr[2];
+      if (!date || valeur === null || valeur === undefined || valeur === "") continue;
+      var valInt = parseInt(valeur, 10);
+      if (isNaN(valInt)) continue;
+      out.push({ date: date, categorie: categorie, valeur: valInt, row: i });
+    }
+    return out.sort(function (a, b) { return a.date - b.date; });
+  }
+
   function parseSuiviWorkbook(arrayBuffer) {
     return parseSuiviWorkbookData(XLSX.read(arrayBuffer, { type: "array", cellDates: true }));
   }
@@ -286,6 +308,12 @@
       problematiques = parseProblematiques(probRows);
     }
 
+    var arriveesPrevues = [];
+    if (wb.SheetNames.indexOf(SHEET_ARRIVEES_PREVUES) !== -1) {
+      var apRows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET_ARRIVEES_PREVUES], { header: 1, raw: true, defval: null });
+      arriveesPrevues = parseArriveesPrevues(apRows);
+    }
+
     return {
       arrivals: arrivals,
       anchor_year: anchorYear,
@@ -294,6 +322,7 @@
       non_diplomes_grid: parseNonDiplomesGrid(ifmiaRows, anchorYear),
       manual_kpis: weekly.manual_kpis,
       problematiques: problematiques,
+      arrivees_prevues: arriveesPrevues,
     };
   }
 
@@ -462,23 +491,16 @@
     var manualEntry = (parsed.manual_kpis || {})[cur.isoYear + "_" + cur.isoWeek];
     var appelsThisWeek = manualEntry && manualEntry.appels !== null ? manualEntry.appels : null;
     var visiteThisWeek = manualEntry && manualEntry.visite !== null ? manualEntry.visite : null;
+    var departIfmiaThisWeek = manualEntry && manualEntry.depart_ifmia !== null ? manualEntry.depart_ifmia : null;
 
-    // Arrivées prévues — planned factory integration dates from the IFMIA
-    // diplômés table (Date Intégration Usine), grouped and summed by date.
-    var upcomingIntegrationsMap = {};
-    ifmiaDip.forEach(function (i) {
-      if (!i.date_integration_usine) return;
-      var key = i.date_integration_usine.getTime();
-      if (!upcomingIntegrationsMap[key]) upcomingIntegrationsMap[key] = { date: i.date_integration_usine, value: 0 };
-      upcomingIntegrationsMap[key].value += i.effectif;
-    });
-    var upcomingIntegrationsSorted = Object.keys(upcomingIntegrationsMap).map(function (k) { return upcomingIntegrationsMap[k]; })
-      .sort(function (a, b) { return a.date - b.date; });
-    // Only one "Arrivées prévues" card at a time: the next upcoming
-    // integration date, or the most recent one if none is still ahead.
-    var nextIntegration = upcomingIntegrationsSorted.filter(function (r) { return r.date >= refPoint; })[0]
-      || upcomingIntegrationsSorted[upcomingIntegrationsSorted.length - 1];
-    var upcomingIntegrations = nextIntegration ? [{ date_label: fmtDateFr(nextIntegration.date), value: nextIntegration.value }] : [];
+    // Arrivées prévues — a hand-maintained list of upcoming arrivals (see
+    // the "Arrivees Prevues" sheet), shown until their date has passed.
+    // Uses the start of the selected week (not its Sunday like refPoint)
+    // so entries dated earlier in that same week still show.
+    var announceRefPoint = dateFrom || today;
+    var upcomingIntegrations = (parsed.arrivees_prevues || [])
+      .filter(function (r) { return r.date >= announceRefPoint; })
+      .map(function (r) { return { date_label: fmtDateFr(r.date), categorie: r.categorie, value: r.valeur, row: r.row }; });
 
     return {
       empty: false,
@@ -492,6 +514,7 @@
       formation: { labels: formationLabels, estimation: formationEstimation, reel: formationReel },
       appels_this_week: appelsThisWeek,
       visite_this_week: visiteThisWeek,
+      depart_ifmia_this_week: departIfmiaThisWeek,
       ifmia_diplomes_total: ifmiaDiplomesTotal,
       ifmia_ferrage_total: ifmiaFerrageTotal,
       ifmia_montage_total: ifmiaMontageTotal,
@@ -514,6 +537,17 @@
   var weeksLoaded = false;
 
   function fmt(n) { return (n || 0).toLocaleString("fr-FR"); }
+
+  var CATEGORIE_LABELS = { "diplomes": "Diplômés IFMIA", "non diplomes": "Non diplômés" };
+  function categorieLabel(cat) {
+    return CATEGORIE_LABELS[norm(cat).replace(/\s+/g, " ").trim()] || cat || "";
+  }
+
+  // Builds a single-quoted JS string literal safe to embed inside a
+  // double-quoted HTML attribute (e.g. onclick="fn('...')").
+  function jsStr(s) {
+    return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  }
 
   function buildWeeklyChart(labels, values, thisWeekLabel) {
     var dom = document.getElementById("us-chart-weekly");
@@ -719,6 +753,8 @@
     setKpiValue("us-kpi-appels", d.appels_this_week);
     document.getElementById("us-visite-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-visite", d.visite_this_week);
+    document.getElementById("us-depart-ifmia-week-label").textContent = d.this_week_label || "cette semaine";
+    setKpiValue("us-kpi-depart-ifmia", d.depart_ifmia_this_week);
 
     renderAtelierTable(d.atelier_formation);
     renderJulyTable(d.july_to_today);
@@ -729,7 +765,12 @@
       var integrations = d.upcoming_integrations || [];
       announceCard.style.display = integrations.length ? "block" : "none";
       announceList.innerHTML = integrations.map(function (r) {
-        return '<div class="us-announce-item">Arrivée prévue le <strong>' + r.date_label + "</strong> est <strong>" + fmt(r.value) + "</strong></div>";
+        var catLabel = categorieLabel(r.categorie);
+        return '<div class="us-announce-item">' +
+          '<span>Arrivée prévue le <strong>' + r.date_label + "</strong>" + (catLabel ? " — " + catLabel : "") + " : <strong>" + fmt(r.value) + "</strong></span>" +
+          '<button type="button" class="us-announce-edit-btn" onclick="usOpenAnnounceEditModal(' + r.row + "," + jsStr(r.date_label) + "," + jsStr(catLabel) + "," + r.value + ')" title="Modifier cette valeur">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+          "</button></div>";
       }).join("");
     }
 
@@ -765,8 +806,9 @@
     "non-diplomes": "En formation (non diplômés)",
     "formation-ferrage": "En formation à IFMIA — Ferrage",
     "formation-montage": "En formation à IFMIA — Montage",
+    "depart-ifmia": "Départ IFMIA",
   };
-  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true };
+  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true, "depart-ifmia": true };
 
   function cellAddr(r, c) { return XLSX.utils.encode_cell({ r: r, c: c }); }
 
@@ -781,7 +823,7 @@
   function resolveEditTarget(kpiKey, weekLabel, dept) {
     var weekNum = parseInt((weekLabel || "").replace(/^S/i, ""), 10);
 
-    if (kpiKey === "appels" || kpiKey === "visite") {
+    if (kpiKey === "appels" || kpiKey === "visite" || kpiKey === "depart-ifmia") {
       var ws = rawWorkbook.Sheets[SHEET_WEEKLY_INDICATORS];
       var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
       var weekRow = -1, weekCols = {};
@@ -803,6 +845,7 @@
         var label = norm((rows[i] || [])[0]);
         if (kpiKey === "appels" && label.indexOf("appel") !== -1) { targetRow = i; break; }
         if (kpiKey === "visite" && label.indexOf("visite") !== -1 && label.indexOf("medic") !== -1) { targetRow = i; break; }
+        if (kpiKey === "depart-ifmia" && label.indexOf("depart") !== -1 && label.indexOf("ifmia") !== -1) { targetRow = i; break; }
       }
       if (targetRow === -1) return { ok: false, reason: "Ligne introuvable dans 'Indicateurs Hebdomadaires'." };
       return { ok: true, sheet: SHEET_WEEKLY_INDICATORS, row: targetRow, col: col };
@@ -887,11 +930,24 @@
     if (bar) bar.style.display = hasPendingEdits ? "flex" : "none";
   }
 
+  function applyAnnounceEdit(row, newValue) {
+    var ws = rawWorkbook.Sheets[SHEET_ARRIVEES_PREVUES];
+    if (!ws) return { ok: false, reason: "Feuille '" + SHEET_ARRIVEES_PREVUES + "' introuvable." };
+    setCell(ws, row, 2, newValue, "n");
+    parsedWorkbook = parseSuiviWorkbookData(rawWorkbook);
+    hasPendingEdits = true;
+    updateEditBar();
+    refresh();
+    return { ok: true };
+  }
+
   var currentEditKey = null;
+  var currentAnnounceRow = null;
 
   window.usOpenEditModal = function (kpiKey) {
     if (!rawWorkbook) return;
     currentEditKey = kpiKey;
+    currentAnnounceRow = null;
     var weekLabel = lastRenderedWeekLabel || "S" + isoWeekInfo(todayUTC()).isoWeek;
     var dept = (document.getElementById("us-dept-select") || {}).value || "";
     var weekScoped = !!WEEK_SCOPED_EDIT[kpiKey];
@@ -919,9 +975,28 @@
     if (target.ok) input.focus();
   };
 
+  window.usOpenAnnounceEditModal = function (row, dateLabel, categorieText, currentValue) {
+    if (!rawWorkbook) return;
+    currentEditKey = null;
+    currentAnnounceRow = row;
+
+    document.getElementById("us-edit-modal-title").textContent = "Arrivée prévue — " + categorieText;
+    var weekEl = document.getElementById("us-edit-modal-week");
+    weekEl.style.display = "";
+    weekEl.textContent = "Le " + dateLabel;
+
+    document.getElementById("us-edit-modal-error").style.display = "none";
+    var input = document.getElementById("us-edit-modal-input");
+    input.style.display = "";
+    input.value = currentValue;
+    document.getElementById("us-edit-modal-overlay").style.display = "flex";
+    input.focus();
+  };
+
   window.usCloseEditModal = function () {
     document.getElementById("us-edit-modal-overlay").style.display = "none";
     currentEditKey = null;
+    currentAnnounceRow = null;
   };
 
   window.usSaveEditModal = function () {
@@ -933,9 +1008,14 @@
       errEl.textContent = "Merci d'entrer un nombre valide (≥ 0).";
       return;
     }
-    var weekLabel = lastRenderedWeekLabel || "S" + isoWeekInfo(todayUTC()).isoWeek;
-    var dept = (document.getElementById("us-dept-select") || {}).value || "";
-    var result = applyKpiEdit(currentEditKey, weekLabel, dept, val);
+    var result;
+    if (currentAnnounceRow !== null) {
+      result = applyAnnounceEdit(currentAnnounceRow, val);
+    } else {
+      var weekLabel = lastRenderedWeekLabel || "S" + isoWeekInfo(todayUTC()).isoWeek;
+      var dept = (document.getElementById("us-dept-select") || {}).value || "";
+      result = applyKpiEdit(currentEditKey, weekLabel, dept, val);
+    }
     if (!result.ok) {
       errEl.style.display = "block";
       errEl.textContent = result.reason;
