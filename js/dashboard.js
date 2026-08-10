@@ -469,9 +469,13 @@
       if (!upcomingIntegrationsMap[key]) upcomingIntegrationsMap[key] = { date: i.date_integration_usine, value: 0 };
       upcomingIntegrationsMap[key].value += i.effectif;
     });
-    var upcomingIntegrations = Object.keys(upcomingIntegrationsMap).map(function (k) { return upcomingIntegrationsMap[k]; })
-      .sort(function (a, b) { return a.date - b.date; })
-      .map(function (r) { return { date_label: fmtDateFr(r.date), value: r.value }; });
+    var upcomingIntegrationsSorted = Object.keys(upcomingIntegrationsMap).map(function (k) { return upcomingIntegrationsMap[k]; })
+      .sort(function (a, b) { return a.date - b.date; });
+    // Only one "Arrivées prévues" card at a time: the next upcoming
+    // integration date, or the most recent one if none is still ahead.
+    var nextIntegration = upcomingIntegrationsSorted.filter(function (r) { return r.date >= refPoint; })[0]
+      || upcomingIntegrationsSorted[upcomingIntegrationsSorted.length - 1];
+    var upcomingIntegrations = nextIntegration ? [{ date_label: fmtDateFr(nextIntegration.date), value: nextIntegration.value }] : [];
 
     return {
       empty: false,
