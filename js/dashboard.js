@@ -334,7 +334,11 @@
     var weeklyValues = weeklySorted.map(function (w) { return w.value; });
 
     var today = todayUTC();
-    var cur = isoWeekInfo(today);
+    // "cette semaine" follows the selected Semaine filter (dateTo is its
+    // Sunday) when one is picked — showing that week's real numbers, i.e.
+    // the historique — and falls back to today's actual week otherwise.
+    var refPoint = dateTo || today;
+    var cur = isoWeekInfo(refPoint);
     var thisWeekEntry = weeklySorted.filter(function (w) { return w.year === cur.isoYear && w.week === cur.isoWeek; })[0];
     var thisWeekTotal = thisWeekEntry ? thisWeekEntry.value : 0;
 
@@ -399,7 +403,7 @@
 
     var upcomingByDept = {};
     arrivals.forEach(function (a) {
-      if (a.date_debut_contrat && a.date_debut_contrat > today) {
+      if (a.date_debut_contrat && a.date_debut_contrat > refPoint) {
         upcomingByDept[a.departement] = (upcomingByDept[a.departement] || 0) + a.effectif;
       }
     });
