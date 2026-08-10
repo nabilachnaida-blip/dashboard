@@ -430,9 +430,17 @@
     var ifmiaDip = parsed.formation_ifmia;
     if (depParam) ifmiaDip = ifmiaDip.filter(function (i) { return i.ur === depParam; });
     var ifmiaDiplomesTotal = null;
+    var ifmiaFerrageTotal = null, ifmiaMontageTotal = null;
     if (ifmiaDip.length) {
       ifmiaDiplomesTotal = 0;
-      ifmiaDip.forEach(function (i) { ifmiaDiplomesTotal += i.effectif; });
+      var ferSum = 0, ferHas = false, monSum = 0, monHas = false;
+      ifmiaDip.forEach(function (i) {
+        ifmiaDiplomesTotal += i.effectif;
+        if (i.ur === "FER") { ferSum += i.effectif; ferHas = true; }
+        else if (i.ur === "MON") { monSum += i.effectif; monHas = true; }
+      });
+      ifmiaFerrageTotal = ferHas ? ferSum : null;
+      ifmiaMontageTotal = monHas ? monSum : null;
     }
 
     // Non-diplômés — sum across departments (or just the selected one) for
@@ -452,6 +460,19 @@
     var appelsThisWeek = manualEntry && manualEntry.appels !== null ? manualEntry.appels : null;
     var visiteThisWeek = manualEntry && manualEntry.visite !== null ? manualEntry.visite : null;
 
+    // Arrivées prévues — planned factory integration dates from the IFMIA
+    // diplômés table (Date Intégration Usine), grouped and summed by date.
+    var upcomingIntegrationsMap = {};
+    ifmiaDip.forEach(function (i) {
+      if (!i.date_integration_usine) return;
+      var key = i.date_integration_usine.getTime();
+      if (!upcomingIntegrationsMap[key]) upcomingIntegrationsMap[key] = { date: i.date_integration_usine, value: 0 };
+      upcomingIntegrationsMap[key].value += i.effectif;
+    });
+    var upcomingIntegrations = Object.keys(upcomingIntegrationsMap).map(function (k) { return upcomingIntegrationsMap[k]; })
+      .sort(function (a, b) { return a.date - b.date; })
+      .map(function (r) { return { date_label: fmtDateFr(r.date), value: r.value }; });
+
     return {
       empty: false,
       departments: presentCodes.map(function (c) { return { code: c, label: c }; }),
@@ -465,6 +486,9 @@
       appels_this_week: appelsThisWeek,
       visite_this_week: visiteThisWeek,
       ifmia_diplomes_total: ifmiaDiplomesTotal,
+      ifmia_ferrage_total: ifmiaFerrageTotal,
+      ifmia_montage_total: ifmiaMontageTotal,
+      upcoming_integrations: upcomingIntegrations,
       ifmia_non_diplomes_this_week: ifmiaNonDiplomesThisWeek,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
       problematiques: parsed.problematiques,
@@ -641,6 +665,8 @@
     document.getElementById("us-kpi-upcoming").textContent = fmt(d.upcoming_contracts.total);
 
     setKpiValue("us-kpi-formation", d.ifmia_diplomes_total);
+    setKpiValue("us-kpi-formation-ferrage", d.ifmia_ferrage_total);
+    setKpiValue("us-kpi-formation-montage", d.ifmia_montage_total);
     document.getElementById("us-ifmia-nondip-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-next-week", d.ifmia_non_diplomes_this_week);
 
@@ -685,6 +711,16 @@
 
     renderAtelierTable(d.atelier_formation);
     renderJulyTable(d.july_to_today);
+
+    var announceCard = document.getElementById("us-announce-card");
+    var announceList = document.getElementById("us-announce-list");
+    if (announceCard && announceList) {
+      var integrations = d.upcoming_integrations || [];
+      announceCard.style.display = integrations.length ? "block" : "none";
+      announceList.innerHTML = integrations.map(function (r) {
+        return '<div class="us-announce-item">Arrivée prévue le <strong>' + r.date_label + "</strong> est <strong>" + fmt(r.value) + "</strong></div>";
+      }).join("");
+    }
 
     var prob = d.problematiques;
     var insightCard = document.getElementById("us-insight-card");
