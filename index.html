@@ -130,6 +130,18 @@
           </div>
         </div>
       </div>
+      <div class="us-kpi-card us-c11" id="us-kpi-card-birdcage">
+        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+        <div class="us-kpi-body">
+          <div class="us-kpi-label">En formation à IFMIA — Bird Cage — <span id="us-formation-birdcage-week-label">cette semaine</span></div>
+          <div class="us-kpi-value-row">
+            <div class="us-kpi-value" id="us-kpi-formation-birdcage">&mdash;</div>
+            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('formation-birdcage')" title="Modifier cette valeur">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="us-kpi-card us-c4">
         <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg></div>
         <div class="us-kpi-body">
@@ -192,6 +204,17 @@
     <div class="us-chart-card us-announce-card" id="us-announce-card" style="display:none;">
       <div class="us-chart-title">Arrivée prévue</div>
       <div id="us-announce-list" class="us-announce-list"></div>
+    </div>
+
+    <!-- Répartition arrivée usine -->
+    <div class="us-detail-card" id="us-rau-card" style="display:none;">
+      <div class="us-chart-title">Répartition arrivée usine</div>
+      <div style="overflow-x:auto;">
+        <table class="us-detail-tbl">
+          <thead><tr><th>département</th><th>Effectif</th></tr></thead>
+          <tbody id="us-rau-tbl-body"></tbody>
+        </table>
+      </div>
     </div>
 
 

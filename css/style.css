@@ -76,6 +76,7 @@ body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
 .us-kpi-card.us-c8::before,.us-kpi-card.us-c8::after{background:#db2777;}
 .us-kpi-card.us-c9::before,.us-kpi-card.us-c9::after{background:#0891b2;}
 .us-kpi-card.us-c10::before,.us-kpi-card.us-c10::after{background:#b91c1c;}
+.us-kpi-card.us-c11::before,.us-kpi-card.us-c11::after{background:#ca8a04;}
 
 .us-kpi-card.us-c1 .us-kpi-icon{background:rgba(11,63,145,.10);color:#0B3F91;}
 .us-kpi-card.us-c2 .us-kpi-icon{background:rgba(0,179,184,.12);color:#00838a;}
@@ -87,6 +88,7 @@ body.us-locked main,body.us-locked #us-welcome-overlay{display:none;}
 .us-kpi-card.us-c8 .us-kpi-icon{background:rgba(219,39,119,.10);color:#db2777;}
 .us-kpi-card.us-c9 .us-kpi-icon{background:rgba(8,145,178,.10);color:#0891b2;}
 .us-kpi-card.us-c10 .us-kpi-icon{background:rgba(185,28,28,.10);color:#b91c1c;}
+.us-kpi-card.us-c11 .us-kpi-icon{background:rgba(202,138,4,.12);color:#ca8a04;}
 
 .us-kpi-label{font-size:11.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
 .us-kpi-value{font-size:28px;font-weight:800;font-family:var(--font-cond);color:#1e293b;line-height:1.1;}

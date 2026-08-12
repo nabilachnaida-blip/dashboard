@@ -7,9 +7,11 @@
 
   var SHEET_ARRIVALS = "integration Usine";
   var SHEET_FORMATION_IFMIA = "En formation IFMIA";
+  var SHEET_NON_DIPLOMES_IFMIA = "Non Diplomes IFMIA";
   var SHEET_WEEKLY_INDICATORS = "Indicateurs Hebdomadaires";
   var SHEET_PROBLEMATIQUES = "Problematiques";
   var SHEET_ARRIVEES_PREVUES = "Arrivees Prevues";
+  var SHEET_REPARTITION_ARRIVEE_USINE = "Repartition Arrivee Usine";
   var ATELIER_MAP = { ferrage: "FERRAGE", montage: "MONTAGE", peinture: "PEINTURE" };
 
   var US_BLUE = "#0B3F91";
@@ -196,16 +198,14 @@
     };
   }
 
-  // Locates a "UR" header cell at colOffset and the S30..S40 week columns
-  // right after it — bounded to exactly 11 columns so it never picks up
-  // headers from a second grid sitting further right on the same row (the
-  // diplômés and non-diplômés grids share rows in "En formation IFMIA").
-  function findUrWeekHeader(rows, colOffset) {
+  // Locates the "UR" header cell in column A and the S30..S40 week columns
+  // right after it.
+  function findUrWeekHeader(rows) {
     for (var r = 0; r < Math.min(rows.length, 10); r++) {
-      if (norm((rows[r] || [])[colOffset]) === "ur") {
+      if (norm((rows[r] || [])[0]) === "ur") {
         var weekCols = {};
         var row = rows[r] || [];
-        for (var c = colOffset + 1; c <= colOffset + 11; c++) {
+        for (var c = 1; c <= 11; c++) {
           var m = norm(row[c]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
           if (m) weekCols[c] = parseInt(m[1], 10);
         }
@@ -215,19 +215,19 @@
     return { headerRow: -1, weekCols: {} };
   }
 
-  // Generic UR × semaine grid parser — the "En formation IFMIA" sheet has
-  // two side-by-side grids of this exact shape: diplômés at column A, and
-  // non-diplômés at column N (shifted right to make room). Each week is
-  // its own column so historical weeks are never overwritten.
-  function parseUrWeekGrid(rows, anchorYear, colOffset) {
-    var header = findUrWeekHeader(rows, colOffset);
+  // Generic UR × semaine grid parser — used for both the "En formation
+  // IFMIA" (diplômés) and "Non Diplomes IFMIA" sheets, each its own sheet
+  // of this exact shape. Each week is its own column so historical weeks
+  // are never overwritten.
+  function parseUrWeekGrid(rows, anchorYear) {
+    var header = findUrWeekHeader(rows);
     var headerRow = header.headerRow, weekCols = header.weekCols;
     if (headerRow === -1) return [];
 
     var out = [];
     for (var i = headerRow + 1; i < rows.length; i++) {
       var rr = rows[i] || [];
-      var ur = rr[colOffset];
+      var ur = rr[0];
       if (!clean(ur)) continue;
       Object.keys(weekCols).forEach(function (colStr) {
         var col = Number(colStr), week = weekCols[colStr];
@@ -242,11 +242,11 @@
   }
 
   function parseFormationIfmiaGrid(rows, anchorYear) {
-    return parseUrWeekGrid(rows, anchorYear, 0); // column A, 0-indexed
+    return parseUrWeekGrid(rows, anchorYear);
   }
 
   function parseNonDiplomesGrid(rows, anchorYear) {
-    return parseUrWeekGrid(rows, anchorYear, 13); // column N, 0-indexed
+    return parseUrWeekGrid(rows, anchorYear);
   }
 
   // Optional "Problematiques" sheet: an intro line, a numbered list of
@@ -293,6 +293,23 @@
     return out.sort(function (a, b) { return a.date - b.date; });
   }
 
+  // Optional "Repartition Arrivee Usine" sheet: a hand-maintained snapshot
+  // of headcount by department (Departement / Effectif), plant-wide — not
+  // scoped by the département/semaine filters, same as "Arrivees Prevues".
+  function parseRepartitionArriveeUsine(rows) {
+    var out = [];
+    for (var i = 1; i < rows.length; i++) {
+      var rr = rows[i] || [];
+      var dep = clean(rr[0]);
+      var eff = rr[1];
+      if (!dep || eff === null || eff === undefined || eff === "") continue;
+      var effInt = parseInt(eff, 10);
+      if (isNaN(effInt)) continue;
+      out.push({ departement: dep, effectif: effInt });
+    }
+    return out;
+  }
+
   function parseSuiviWorkbook(arrayBuffer) {
     return parseSuiviWorkbookData(XLSX.read(arrayBuffer, { type: "array", cellDates: true }));
   }
@@ -327,15 +344,27 @@
       arriveesPrevues = parseArriveesPrevues(apRows);
     }
 
+    var repartitionArriveeUsine = [];
+    if (wb.SheetNames.indexOf(SHEET_REPARTITION_ARRIVEE_USINE) !== -1) {
+      var rauRows = sheetRows(wb.Sheets[SHEET_REPARTITION_ARRIVEE_USINE]);
+      repartitionArriveeUsine = parseRepartitionArriveeUsine(rauRows);
+    }
+
+    var nonDiplomesRows = [];
+    if (wb.SheetNames.indexOf(SHEET_NON_DIPLOMES_IFMIA) !== -1) {
+      nonDiplomesRows = sheetRows(wb.Sheets[SHEET_NON_DIPLOMES_IFMIA]);
+    }
+
     return {
       arrivals: arrivals,
       anchor_year: anchorYear,
       formation_semaine: weekly.formation_semaine,
       formation_ifmia: parseFormationIfmiaGrid(ifmiaRows, anchorYear),
-      non_diplomes_grid: parseNonDiplomesGrid(ifmiaRows, anchorYear),
+      non_diplomes_grid: parseNonDiplomesGrid(nonDiplomesRows, anchorYear),
       manual_kpis: weekly.manual_kpis,
       problematiques: problematiques,
       arrivees_prevues: arriveesPrevues,
+      repartition_arrivee_usine: repartitionArriveeUsine,
     };
   }
 
@@ -487,14 +516,16 @@
     var ifmiaDipRows = parsed.formation_ifmia || [];
     if (depParam) ifmiaDipRows = ifmiaDipRows.filter(function (i) { return i.ur === depParam; });
     var ifmiaDipThisWeek = ifmiaDipRows.filter(function (r) { return r.iso_year === cur.isoYear && r.iso_week === cur.isoWeek; });
-    var ifmiaFerrageTotal = null, ifmiaMontageTotal = null;
-    var ferHas = false, monHas = false;
+    var ifmiaFerrageTotal = null, ifmiaMontageTotal = null, ifmiaBirdCageTotal = null;
+    var ferHas = false, monHas = false, bcHas = false;
     ifmiaDipThisWeek.forEach(function (i) {
       if (i.ur === "FER") { ifmiaFerrageTotal = (ifmiaFerrageTotal || 0) + i.effectif; ferHas = true; }
       else if (i.ur === "MON") { ifmiaMontageTotal = (ifmiaMontageTotal || 0) + i.effectif; monHas = true; }
+      else if (i.ur === "BC") { ifmiaBirdCageTotal = (ifmiaBirdCageTotal || 0) + i.effectif; bcHas = true; }
     });
     if (!ferHas) ifmiaFerrageTotal = null;
     if (!monHas) ifmiaMontageTotal = null;
+    if (!bcHas) ifmiaBirdCageTotal = null;
 
     // Total à IFMIA is its own manually-entered "TOTAL" row (not the sum
     // of Ferrage + Montage + other lots) — plant-wide, so not filtered by
@@ -532,6 +563,11 @@
       .filter(function (r) { return r.date >= today; })
       .map(function (r) { return { date_label: fmtDateFr(r.date), categorie: r.categorie, value: r.valeur, row: r.row }; });
 
+    // Répartition arrivée usine — hand-maintained snapshot, plant-wide
+    // (same as arrivées prévues: not filtered by département/semaine).
+    var repartitionArriveeUsineRows = parsed.repartition_arrivee_usine || [];
+    var repartitionArriveeUsineTotal = repartitionArriveeUsineRows.reduce(function (s, r) { return s + r.effectif; }, 0);
+
     return {
       empty: false,
       departments: presentCodes.map(function (c) { return { code: c, label: c }; }),
@@ -548,12 +584,14 @@
       ifmia_diplomes_total: ifmiaDiplomesTotal,
       ifmia_ferrage_total: ifmiaFerrageTotal,
       ifmia_montage_total: ifmiaMontageTotal,
+      ifmia_birdcage_total: ifmiaBirdCageTotal,
       upcoming_integrations: upcomingIntegrations,
       ifmia_non_diplomes_this_week: ifmiaNonDiplomesThisWeek,
       upcoming_contracts: { total: upcomingTotal, by_departement: upcomingList },
       problematiques: parsed.problematiques,
       atelier_formation: atelierByWeek,
       july_to_today: { rows: julyDeptList, total: julyDeptTotal, from: julyStart, to: today },
+      repartition_arrivee_usine: { rows: repartitionArriveeUsineRows, total: repartitionArriveeUsineTotal },
     };
   }
 
@@ -702,6 +740,19 @@
     tbody.innerHTML = rowsHtml;
   }
 
+  function renderRepartitionArriveeUsineTable(data) {
+    var card = document.getElementById("us-rau-card");
+    var tbody = document.getElementById("us-rau-tbl-body");
+    if (!card || !tbody) return;
+    if (!data.rows.length) { card.style.display = "none"; return; }
+    card.style.display = "block";
+    var rowsHtml = data.rows.map(function (r) {
+      return "<tr><td>" + r.departement + "</td><td>" + fmt(r.effectif) + "</td></tr>";
+    }).join("");
+    rowsHtml += '<tr style="font-weight:800;background:#f8fafc;"><td>Total général</td><td>' + fmt(data.total) + "</td></tr>";
+    tbody.innerHTML = rowsHtml;
+  }
+
   function populateDepartments(depts, selected) {
     var sel = document.getElementById("us-dept-select");
     if (!sel || deptsLoaded) return;
@@ -742,9 +793,11 @@
     document.getElementById("us-formation-total-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-formation", d.ifmia_diplomes_total);
     document.getElementById("us-formation-ferrage-week-label").textContent = d.this_week_label || "cette semaine";
-    setKpiValue("us-kpi-formation-ferrage", d.ifmia_ferrage_total);
+    setDeptKpiValue("us-kpi-formation-ferrage", d.ifmia_ferrage_total);
     document.getElementById("us-formation-montage-week-label").textContent = d.this_week_label || "cette semaine";
-    setKpiValue("us-kpi-formation-montage", d.ifmia_montage_total);
+    setDeptKpiValue("us-kpi-formation-montage", d.ifmia_montage_total);
+    document.getElementById("us-formation-birdcage-week-label").textContent = d.this_week_label || "cette semaine";
+    setDeptKpiValue("us-kpi-formation-birdcage", d.ifmia_birdcage_total);
     document.getElementById("us-ifmia-nondip-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-next-week", d.ifmia_non_diplomes_this_week);
 
@@ -782,6 +835,21 @@
       }
     }
 
+    // Per-département formation-IFMIA KPIs (Ferrage/Montage/Bird Cage) are
+    // hidden entirely when the value is 0 — a card showing "0" for a
+    // département that just isn't training anyone this week is noise.
+    function setDeptKpiValue(elId, value) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      var card = el.closest(".us-kpi-card");
+      if (value === 0) {
+        if (card) card.style.display = "none";
+        return;
+      }
+      if (card) card.style.display = "";
+      setKpiValue(elId, value);
+    }
+
     document.getElementById("us-appels-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-appels", d.appels_this_week);
     document.getElementById("us-visite-week-label").textContent = d.this_week_label || "cette semaine";
@@ -791,6 +859,7 @@
 
     renderAtelierTable(d.atelier_formation);
     renderJulyTable(d.july_to_today);
+    renderRepartitionArriveeUsineTable(d.repartition_arrivee_usine);
 
     var announceCard = document.getElementById("us-announce-card");
     var announceList = document.getElementById("us-announce-list");
@@ -839,10 +908,11 @@
     "non-diplomes": "En formation (non diplômés)",
     "formation-ferrage": "En formation à IFMIA — Ferrage",
     "formation-montage": "En formation à IFMIA — Montage",
+    "formation-birdcage": "En formation à IFMIA — Bird Cage",
     "formation-total": "En formation total à IFMIA",
     "depart-ifmia": "Départ IFMIA",
   };
-  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true, "depart-ifmia": true, "formation-ferrage": true, "formation-montage": true, "formation-total": true };
+  var WEEK_SCOPED_EDIT = { appels: true, visite: true, "non-diplomes": true, "depart-ifmia": true, "formation-ferrage": true, "formation-montage": true, "formation-birdcage": true, "formation-total": true };
 
   function cellAddr(r, c) { return XLSX.utils.encode_cell({ r: r, c: c }); }
 
@@ -886,10 +956,10 @@
     }
 
     if (kpiKey === "non-diplomes") {
-      var ws2 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
+      var ws2 = rawWorkbook.Sheets[SHEET_NON_DIPLOMES_IFMIA];
       var rows2 = sheetRows(ws2);
-      var colOffset = 13; // column N, 0-indexed — see parseNonDiplomesGrid
-      var header2 = findUrWeekHeader(rows2, colOffset);
+      var colOffset = 0; // column A, 0-indexed — its own sheet since the split
+      var header2 = findUrWeekHeader(rows2);
       var headerRow = header2.headerRow, weekCols2 = header2.weekCols;
       if (headerRow === -1) return { ok: false, reason: "Grille non-diplômés introuvable." };
       var col2 = -1;
@@ -906,17 +976,17 @@
       }
       if (targetRow2 === -1) {
         targetRow2 = lastRow + 1;
-        return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: targetRow2, col: col2, ensureLabel: { col: colOffset, value: urTarget } };
+        return { ok: true, sheet: SHEET_NON_DIPLOMES_IFMIA, row: targetRow2, col: col2, ensureLabel: { col: colOffset, value: urTarget } };
       }
-      return { ok: true, sheet: SHEET_FORMATION_IFMIA, row: targetRow2, col: col2 };
+      return { ok: true, sheet: SHEET_NON_DIPLOMES_IFMIA, row: targetRow2, col: col2 };
     }
 
-    if (kpiKey === "formation-ferrage" || kpiKey === "formation-montage" || kpiKey === "formation-total") {
-      var urCode = kpiKey === "formation-ferrage" ? "FER" : kpiKey === "formation-montage" ? "MON" : "TOTAL";
+    if (kpiKey === "formation-ferrage" || kpiKey === "formation-montage" || kpiKey === "formation-birdcage" || kpiKey === "formation-total") {
+      var urCode = kpiKey === "formation-ferrage" ? "FER" : kpiKey === "formation-montage" ? "MON" : kpiKey === "formation-birdcage" ? "BC" : "TOTAL";
       var ws3 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
       var rows3 = sheetRows(ws3);
       var dipColOffset = 0; // column A, 0-indexed — see parseFormationIfmiaGrid
-      var header3 = findUrWeekHeader(rows3, dipColOffset);
+      var header3 = findUrWeekHeader(rows3);
       var headerRow3 = header3.headerRow, weekCols3 = header3.weekCols;
       if (headerRow3 === -1) return { ok: false, reason: "Tableau des diplômés introuvable." };
       var col3 = -1;
