@@ -683,14 +683,21 @@
       var rows = atelierByWeek[o.key] || [];
       var estCells = rows.map(function (r) { return "<td>" + fmt(r.estimation) + "</td>"; }).join("");
       var reelCells = rows.map(function (r) { return "<td>" + fmt(r.reel) + "</td>"; }).join("");
+      var cumul = 0;
       var ecartCells = rows.map(function (r) {
         var e = r.reel - r.estimation;
         var color = e > 0 ? "#0a7c55" : e < 0 ? "#c2410c" : "#1e293b";
         return '<td style="color:' + color + ';font-weight:700;">' + (e > 0 ? "+" : "") + e + "</td>";
       }).join("");
-      rowsHtml += "<tr><td rowspan=\"3\" style=\"font-weight:700;\">" + o.label + "</td><td>Estimation</td>" + estCells + "</tr>";
+      var ecartCumulCells = rows.map(function (r) {
+        cumul += r.reel - r.estimation;
+        var color = cumul > 0 ? "#0a7c55" : cumul < 0 ? "#c2410c" : "#1e293b";
+        return '<td style="color:' + color + ';font-weight:700;">' + (cumul > 0 ? "+" : "") + cumul + "</td>";
+      }).join("");
+      rowsHtml += "<tr><td rowspan=\"4\" style=\"font-weight:700;\">" + o.label + "</td><td>Estimation</td>" + estCells + "</tr>";
       rowsHtml += "<tr><td>Réel</td>" + reelCells + "</tr>";
       rowsHtml += "<tr><td>Écart</td>" + ecartCells + "</tr>";
+      rowsHtml += "<tr><td>Écart cumulé</td>" + ecartCumulCells + "</tr>";
     });
     tbody.innerHTML = rowsHtml;
   }
