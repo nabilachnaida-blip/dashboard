@@ -421,27 +421,6 @@
     var thisWeekEntry = weeklySorted.filter(function (w) { return w.year === cur.isoYear && w.week === cur.isoWeek; })[0];
     var thisWeekTotal = thisWeekEntry ? thisWeekEntry.value : 0;
 
-    // "Total du mois" targets the current month once it's mostly over (last
-    // week), otherwise the current month barely has any data yet — show the
-    // last fully-elapsed month instead. An explicit date_to filter overrides
-    // this and always wins.
-    var refDate;
-    if (dateTo) {
-      refDate = dateTo;
-    } else {
-      var daysInCurMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).getUTCDate();
-      var inLastWeekOfMonth = today.getUTCDate() > daysInCurMonth - 7;
-      refDate = inLastWeekOfMonth ? today : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
-    }
-    var monthTotal = 0;
-    arrivals.forEach(function (a) {
-      if (a.date_arrivee_usine.getUTCFullYear() === refDate.getUTCFullYear() && a.date_arrivee_usine.getUTCMonth() === refDate.getUTCMonth()) {
-        monthTotal += a.effectif;
-      }
-    });
-    var MONTH_NAMES_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
-    var monthLabel = MONTH_NAMES_FR[refDate.getUTCMonth()];
-
     // Réel per atelier/semaine is calculated live from the "integration
     // Usine" arrivals (matched by département FER/MON/PEI) — never typed
     // by hand. Estimation stays the manually-entered plan from Indicateurs
@@ -575,8 +554,6 @@
       weekly_arrivals: { labels: weeklyLabels, values: weeklyValues },
       this_week_total: thisWeekTotal,
       this_week_label: "S" + cur.isoWeek,
-      month_total: monthTotal,
-      month_label: monthLabel,
       formation: { labels: formationLabels, estimation: formationEstimation, reel: formationReel },
       appels_this_week: appelsThisWeek,
       visite_this_week: visiteThisWeek,
@@ -786,8 +763,7 @@
     lastRenderedWeekLabel = d.this_week_label || null;
     document.getElementById("us-this-week-label").textContent = d.this_week_label || "cette semaine";
     document.getElementById("us-kpi-week").textContent = fmt(d.this_week_total);
-    document.getElementById("us-kpi-month").textContent = fmt(d.month_total);
-    document.getElementById("us-kpi-month-label").textContent = d.month_label || "";
+    document.getElementById("us-kpi-month").textContent = fmt(d.july_to_today.total);
     document.getElementById("us-kpi-upcoming").textContent = fmt(d.upcoming_contracts.total);
 
     document.getElementById("us-formation-total-week-label").textContent = d.this_week_label || "cette semaine";
