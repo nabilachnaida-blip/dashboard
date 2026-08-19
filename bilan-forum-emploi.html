@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bilan du forum d'emploi — Suivi Usine</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/echarts.min.js"></script>
+</head>
+<body class="us-locked">
+
+<div class="us-gate-overlay" id="us-gate-overlay">
+  <form class="us-gate-box" id="us-gate-form">
+    <div class="us-gate-title">Suivi Usine</div>
+    <div class="us-gate-sub">Accès protégé — entrez le code pour continuer.</div>
+    <input type="password" id="us-gate-input" class="us-gate-input" autocomplete="off" autofocus />
+    <div class="us-gate-error" id="us-gate-error" style="display:none;">Code incorrect.</div>
+    <button type="submit" class="us-btn us-gate-submit">Déverrouiller</button>
+  </form>
+</div>
+
+<main class="page">
+
+  <nav class="us-page-nav">
+    <a href="index.html">Tableau de bord</a>
+    <a href="bilan-aout.html">Bilan du mois d'août</a>
+    <a href="bilan-forum-emploi.html" class="us-active">Bilan forum d'emploi</a>
+  </nav>
+
+  <div class="us-hero">
+    <div>
+      <div class="us-hero-title">Bilan du forum d'emploi</div>
+      <div class="us-hero-sub">Résultats de la campagne de convocation, présence et rétention sur les 8 journées du forum.</div>
+    </div>
+  </div>
+
+  <div class="us-stat-highlights us-reveal-stagger">
+    <div class="us-stat-highlight us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="1360">0</div>
+      <div class="us-stat-highlight-label">Candidats convoqués</div>
+    </div>
+    <div class="us-stat-highlight us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="664">0</div>
+      <div class="us-stat-highlight-label">Présents — 51,2 % de perte</div>
+    </div>
+    <div class="us-stat-highlight us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="627">0</div>
+      <div class="us-stat-highlight-label">Retenus — 5,6 % de perte vs présents</div>
+    </div>
+    <div class="us-stat-highlight us-stat-alt us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="53.9" data-count-decimals="1" data-count-suffix=" %">0 %</div>
+      <div class="us-stat-highlight-label">Perte globale — convoqués → retenus</div>
+    </div>
+  </div>
+
+  <div class="us-video-card us-reveal">
+    <div class="us-chart-title">Vidéo — Forum d'emploi</div>
+    <div class="us-video-wrap">
+      <video controls preload="metadata" src="video.mp4">
+        Votre navigateur ne prend pas en charge la lecture vidéo.
+      </video>
+    </div>
+  </div>
+
+  <!--div class="us-charts-row">
+    <div class="us-detail-card" style="margin-bottom:0;">
+      <div class="us-chart-title">Synthèse de la campagne</div>
+      <div style="overflow-x:auto;">
+        <table class="us-detail-tbl">
+          <thead><tr><th>Étape</th><th>Volume</th><th>Taux de perte</th></tr></thead>
+          <tbody>
+            <tr><td>Convoqués</td><td>1 360</td><td>—</td></tr>
+            <tr><td>Présents</td><td>664</td><td>51,2 % de perte</td></tr>
+            <tr><td>Retenus</td><td>627</td><td>5,6 % de perte par rapport aux présents</td></tr>
+            <tr class="us-tbl-total"><td>Convoqués → Retenus</td><td>627</td><td>53,9 % de perte globale</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div-->
+
+    <div class="us-chart-card us-reveal">
+      <div class="us-chart-title">Convoqués / Présents / Retenus par journée</div>
+      <div id="us-chart-forum-days" class="us-chart"></div>
+    </div>
+
+    <!--div class="us-detail-card" style="margin-bottom:0;">
+      <div class="us-chart-title">Détail par journée</div>
+      <div style="overflow-x:auto;">
+        <table class="us-detail-tbl">
+          <thead><tr><th>Journée</th><th>Convoqués</th><th>Présents</th><th>Retenus</th></tr></thead>
+          <tbody>
+            <tr><td>Journée 1</td><td>230</td><td>111</td><td>109</td></tr>
+            <tr><td>Journée 2</td><td>203</td><td>97</td><td>95</td></tr>
+            <tr><td>Journée 3</td><td>207</td><td>109</td><td>106</td></tr>
+            <tr><td>Journée 4</td><td>177</td><td>83</td><td>78</td></tr>
+            <tr><td>Journée 5</td><td>184</td><td>90</td><td>83</td></tr>
+            <tr><td>Journée 6</td><td>184</td><td>90</td><td>83</td></tr>
+            <tr><td>Journée 7</td><td>180</td><td>75</td><td>70</td></tr>
+            <tr><td>Journée 8</td><td>179</td><td>99</td><td>86</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div-->
+
+</main>
+
+<script src="js/gate.js"></script>
+<script src="js/bilan-forum.js"></script>
+<script src="js/reveal.js"></script>
+</body>
+</html>
