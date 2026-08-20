@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Suivi Usine</title>
+<title>Bilans RH — Mois d'août &amp; forum d'emploi — Suivi Usine</title>
 <link rel="stylesheet" href="css/style.css">
 <script src="js/echarts.min.js"></script>
 <script src="js/xlsx.full.min.js"></script>
@@ -20,296 +20,172 @@
   </form>
 </div>
 
-<div class="us-modal-overlay" id="us-welcome-overlay">
-  <div class="us-modal-box">
-    <div class="us-modal-header">
-      <div class="us-modal-title">Bienvenue sur Suivi Usine</div>
-    </div>
-    <div class="us-modal-body">
-      <p>Ce tableau de bord a été mis en place pour vous permettre de suivre, où que vous soyez, l'activité de nos équipes opérateurs : arrivées à l'usine, avancement des formations, habilitations et visites médicales à venir.</p>
-      <p>L'objectif est simple : rester connecté(e) à la réalité du terrain, même à distance, en déplacement ou en congé, sans dépendre d'un reporting manuel.</p>
-      <p>Bonne consultation.</p>
-      <div class="us-modal-signature">
-        <div class="us-modal-signature-name">Nabila Chnaida</div>
-        <div class="us-modal-signature-role">HR Talent </div>
+<div class="us-modal-overlay" id="us-aout-msg-overlay">
+  <div class="us-modal-box us-modal-box-scroll">
+    <div class="us-bulletin-body">
+      <div class="us-bulletin-header">
+        <div class="us-bulletin-header-left">
+          <div class="us-bulletin-header-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div>
+            <div class="us-bulletin-header-eyebrow">Message de la Direction RH</div>
+            <div class="us-bulletin-header-sub">Bilan de campagne — arrêt annuel</div>
+          </div>
+        </div>
+        <div class="us-bulletin-header-meta">30 juil → Aujourd'hui</div>
       </div>
+      <p> L'arrêt annuel est souvent synonyme de maintenance et de préparation. Cette année, nous y avons ajouté une dimension stratégique majeure : un sprint de recrutement à haute intensité.</p>
+      <p>Alors que les machines étaient à l'arrêt, nos processus de sélection tournaient à leur niveau maximal. Aujourd'hui, nous sommes fiers de vous annoncer des <span class="us-bulletin-highlight">chiffres hors normes</span>.</p>
+      <p>Réussir un tel volume en un temps aussi contraint relève d'une véritable prouesse collective. Nous démarrons cette nouvelle période avec des équipes renforcées, structurées et prêtes à relever tous nos défis opérationnels.</p>
+      <div class="us-bulletin-signoff">Excellente reprise à chacun ! Prêts à découvrir nos résultats ?</div>
     </div>
-    <button class="us-btn us-modal-close" onclick="usCloseWelcome()">C'est compris</button>
+    <div class="us-modal-close-wrap">
+      <button type="button" class="us-btn us-modal-close" onclick="usCloseAoutMessage()">Découvrir les résultats</button>
+    </div>
   </div>
 </div>
 
 <main class="page">
 
   <nav class="us-page-nav">
-    <a href="index.html" class="us-active">Tableau de bord</a>
-    <a href="bilan-aout.html">Bilan du mois d'août</a>
-    <a href="bilan-forum-emploi.html">Bilan forum d'emploi</a>
+    <a href="dashboard.html">Tableau de bord</a>
+    <a href="index.html" class="us-active">Bilans RH</a>
   </nav>
 
   <div class="us-hero">
     <div>
-      <div class="us-hero-title">Suivez votre équipe à distance</div>
-      <div class="us-hero-sub">Restez connecté(e) à votre atelier même en congé — les KPIs clés en un coup d'œil.</div>
+      <div class="us-hero-title">Bilans RH</div>
+      <div class="us-hero-sub">Arrêt annuel &amp; forum d'emploi — retour sur deux temps forts du recrutement 2026.</div>
     </div>
   </div>
 
-  <div id="us-error" class="us-error" style="display:none;"></div>
-  <div id="us-empty" class="us-empty" style="display:none;">
-    Aucune donnée exploitable dans suivi.xlsx.
+  <!-- ── Bilan mois d'août ──────────────────────────────────────────── -->
+  <div class="us-section-divider"><span>Mois d'août — arrêt annuel</span></div>
+
+  <div class="us-stat-highlights us-reveal-stagger">
+    <div class="us-stat-highlight us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="622">0</div>
+      <div class="us-stat-highlight-label">Nouveaux talents intégrés à nos effectifs</div>
+    </div>
+    <div class="us-stat-highlight us-stat-alt us-reveal-item">
+      <div class="us-stat-highlight-value">Record</div>
+      <div class="us-stat-highlight-label">Efficacité opérationnelle sur toute la campagne</div>
+    </div>
   </div>
 
-  <div id="us-content" style="display:none;">
+  <div id="us-aout-data-error" class="us-error" style="display:none;"></div>
 
-    <!-- Filters -->
-    <div class="us-filter-bar">
-      <div class="us-fg">
-        <label>Département</label>
-        <select id="us-dept-select">
-          <option value="">Tous les départements</option>
-        </select>
-      </div>
-      <div class="us-fg">
-        <label>Semaine</label>
-        <select id="us-week-select">
-          <option value="">Toutes les semaines</option>
-        </select>
-      </div>
-      <button class="us-btn us-btn-ghost" onclick="usResetFilters()">Réinitialiser</button>
-    </div>
-
-    <!-- Pending-edits bar -->
-    <div class="us-edit-bar" id="us-edit-bar" style="display:none;">
-      <span>Modifications non enregistrées — téléchargez le fichier puis remplacez-le sur GitHub pour les conserver.</span>
-      <button type="button" class="us-btn" onclick="usDownloadUpdatedWorkbook()">Télécharger suivi.xlsx mis à jour</button>
-    </div>
-
-    <!-- KPIs -->
-    <div class="us-kpi-grid">
-      <div class="us-kpi-card us-c1">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">Arrivés usine — <span id="us-this-week-label">cette semaine</span></div>
-          <div class="us-kpi-value" id="us-kpi-week">&mdash;</div>
-          <div class="us-kpi-sub" id="us-kpi-week-sub"></div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c2">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">Total depuis le 1er juillet à aujourd'hui</div>
-          <div class="us-kpi-value" id="us-kpi-month">&mdash;</div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c3">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">En formation total à IFMIA — <span id="us-formation-total-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-formation">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('formation-total')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c8">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">En formation à IFMIA — Ferrage — <span id="us-formation-ferrage-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-formation-ferrage">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('formation-ferrage')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c9">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">En formation à IFMIA — Montage — <span id="us-formation-montage-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-formation-montage">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('formation-montage')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c11" id="us-kpi-card-birdcage">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">En formation à IFMIA — Birdcage — <span id="us-formation-birdcage-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-formation-birdcage">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('formation-birdcage')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c4">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">En formation (non diplômés) — <span id="us-ifmia-nondip-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-next-week">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('non-diplomes')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c5">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">Habilitation — contrats à venir</div>
-          <div class="us-kpi-value" id="us-kpi-upcoming">&mdash;</div>
-          <div class="us-kpi-sub" id="us-kpi-upcoming-sub"></div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c6">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">Appels téléphoniques — <span id="us-appels-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-appels">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('appels')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c7">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">Visite médicale — <span id="us-visite-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-visite">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('visite')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="us-kpi-card us-c10">
-        <div class="us-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
-        <div class="us-kpi-body">
-          <div class="us-kpi-label">Départ IFMIA — <span id="us-depart-ifmia-week-label">cette semaine</span></div>
-          <div class="us-kpi-value-row">
-            <div class="us-kpi-value" id="us-kpi-depart-ifmia">&mdash;</div>
-            <button type="button" class="us-kpi-edit-btn" onclick="usOpenEditModal('depart-ifmia')" title="Modifier cette valeur">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Arrivée prévue -->
-    <div class="us-chart-card us-announce-card" id="us-announce-card" style="display:none;">
-      <div class="us-chart-title">Arrivée prévue</div>
-      <div id="us-announce-list" class="us-announce-list"></div>
-    </div>
-
-    <!-- Répartition arrivée usine -->
-    <div class="us-detail-card" id="us-rau-card" style="display:none;">
-      <div class="us-chart-title">Répartition arrivée usine</div>
-      <div style="overflow-x:auto;">
-        <table class="us-detail-tbl">
-          <thead><tr><th>département</th><th>Effectif</th></tr></thead>
-          <tbody id="us-rau-tbl-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-
-    <!-- Charts -->
-    <div class="us-charts-row">
-      <div class="us-chart-card">
-        <div class="us-chart-title">Nombre d'arrivés à l'usine par semaine/ global</div>
-        <div id="us-chart-weekly" class="us-chart"></div>
-      </div>
-      
-      <div class="us-detail-card">
-        <div class="us-chart-title">Task Force Mainstraim</div>
-        <div style="overflow-x:auto;">
-          <table class="us-detail-tbl">
-            <thead id="us-atelier-tbl-head"></thead>
-            <tbody id="us-atelier-tbl-body"></tbody>
-          </table>
-        </div>
-        <p class="us-table-note">NB : Ces chiffres correspondent au nombre réel d'intégrations enregistrées le jour J à l'usine, sans tenir compte des départs intervenus au cours de la période d'habilitation.</p>
-      </div>
-      <div class="us-chart-card">
-        <div class="us-chart-title">Formation — Estimation vs Réel par semaine</div>
-        <div id="us-chart-formation" class="us-chart"></div>
-      </div>
-
-      <!-- Problématiques identifiées -->
-    <div class="us-insight-card" id="us-insight-card" style="display:none;">
-      <div class="us-insight-header">
-        <div class="us-insight-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <div class="us-charts-row">
+    <div class="us-chart-card us-reveal">
+      <div class="us-card-header">
+        <div class="us-card-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
         </div>
         <div>
-          <div class="us-insight-title">Problématiques identifiées</div>
-          <div class="us-insight-intro" id="us-insight-intro"></div>
+          <div class="us-card-header-title">Parmi nous — répartition par département</div>
+          <div class="us-card-header-sub">Les départements qui ont le plus recruté</div>
         </div>
       </div>
-       <ul class="us-insight-reasons" id="us-insight-reasons"></ul>
-
-      <div class="us-insight-stats">
-        <div class="us-insight-stat">
-          <svg class="us-insight-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
-          <div>
-            <div class="us-insight-stat-value" id="us-insight-visite">&mdash;</div>
-            <div class="us-insight-stat-label">Perdu entre la visite médicale et la formation</div>
-          </div>
-        </div>
-        <div class="us-insight-stat">
-          <svg class="us-insight-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
-          <div>
-            <div class="us-insight-stat-value" id="us-insight-parcours">&mdash;</div>
-            <div class="us-insight-stat-label">Perdu durant le parcours de formation</div>
-          </div>
-        </div>
-      </div>
+      <div id="us-chart-aout-dept" class="us-chart"></div>
     </div>
 
-
-      <div class="us-chart-card">
-        <div class="us-chart-title">Contrats à venir par département</div>
-        <div id="us-chart-upcoming" class="us-chart"></div>
+    <!--div class="us-detail-card us-reveal" style="margin-bottom:0;">
+      <div class="us-card-header us-card-header-alt">
+        <div class="us-card-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+        </div>
+        <div>
+          <div class="us-card-header-title">Top départements</div>
+          <div class="us-card-header-sub"><span id="us-aout-verified-total">&mdash;</span> intégrations sur la période</div>
+        </div
       </div>
-      <div class="us-detail-card">
-        <div class="us-chart-title" id="us-july-title">Répartition par département</div>
-        <div style="overflow-x:auto;">
-          <table class="us-detail-tbl">
-            <thead><tr><th>département</th><th>Somme de Effectifs</th></tr></thead>
-            <tbody id="us-july-tbl-body"></tbody>
-          </table>
+      <div style="overflow-x:auto;">
+        <table class="us-detail-tbl">
+          <thead><tr><th>Département</th><th>Effectif</th></tr></thead>
+          <tbody id="us-aout-dept-tbl-body"></tbody>
+        </table>
+      </div>
+    </div-->
+
+    <div class="us-chart-card us-reveal">
+      <div class="us-card-header">
+        <div class="us-card-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div>
+          <div class="us-card-header-title">Intégrations par semaine</div>
+          <div class="us-card-header-sub">Progression S31 → S35</div>
         </div>
       </div>
+      <div id="us-chart-aout-weekly" class="us-chart"></div>
     </div>
-
   </div>
+
+  <!-- ── Bilan forum d'emploi ───────────────────────────────────────── -->
+  <div class="us-hero us-reveal" style="margin-top:44px;">
+    <div>
+      <div class="us-hero-title">Bilan du forum d'emploi</div>
+      <div class="us-hero-sub">Résultats de la campagne de convocation, présence et rétention sur les 8 journées du forum.</div>
+    </div>
+  </div>
+
+  <div class="us-stat-highlights us-reveal-stagger">
+    <div class="us-stat-highlight us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="1360">0</div>
+      <div class="us-stat-highlight-label">Candidats convoqués</div>
+    </div>
+    <div class="us-stat-highlight us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="664">0</div>
+      <div class="us-stat-highlight-label">Présents — 51,2 % de perte</div>
+    </div>
+    <div class="us-stat-highlight us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="627">0</div>
+      <div class="us-stat-highlight-label">Retenus — 5,6 % de perte vs présents</div>
+    </div>
+    <div class="us-stat-highlight us-stat-alt us-reveal-item">
+      <div class="us-stat-highlight-value" data-count-to="53.9" data-count-decimals="1" data-count-suffix=" %">0 %</div>
+      <div class="us-stat-highlight-label">Perte globale — convoqués → retenus</div>
+    </div>
+  </div>
+
+  <div class="us-video-card us-reveal">
+    <div class="us-chart-title">Vidéo — Forum d'emploi</div>
+    <div class="us-video-wrap">
+      <video controls preload="metadata" src="video.mp4">
+        Votre navigateur ne prend pas en charge la lecture vidéo.
+      </video>
+    </div>
+  </div>
+
+  <div class="us-chart-card us-reveal">
+    <div class="us-chart-title">Convoqués / Présents / Retenus par journée</div>
+    <div id="us-chart-forum-days" class="us-chart"></div>
+  </div>
+
 </main>
 
-<!-- Edit KPI modal -->
-<div class="us-edit-modal-overlay" id="us-edit-modal-overlay" style="display:none;">
-  <div class="us-edit-modal">
-    <div class="us-edit-modal-title" id="us-edit-modal-title">Modifier</div>
-    <div class="us-edit-modal-week" id="us-edit-modal-week"></div>
-    <input type="number" id="us-edit-modal-input" class="us-edit-modal-input" min="0" placeholder="Valeur">
-    <div class="us-edit-modal-error" id="us-edit-modal-error" style="display:none;"></div>
-    <div class="us-edit-modal-actions">
-      <button type="button" class="us-btn us-btn-ghost" onclick="usCloseEditModal()">Annuler</button>
-      <button type="button" class="us-btn" onclick="usSaveEditModal()">Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<script src="js/dashboard.js"></script>
+<script src="js/gate.js"></script>
+<script src="js/bilan-aout.js"></script>
+<script src="js/bilan-forum.js"></script>
+<script src="js/reveal.js"></script>
+<script>
+  // Opening-message overlay: shows as soon as the access gate unlocks,
+  // so it's the first thing seen on this page — dismiss reveals the
+  // dashboard content underneath.
+  (function () {
+    var overlay = document.getElementById("us-aout-msg-overlay");
+    function show() { if (overlay) overlay.classList.add("us-show"); }
+    if (!document.body.classList.contains("us-locked")) {
+      show();
+    } else {
+      var observer = new MutationObserver(function () {
+        if (!document.body.classList.contains("us-locked")) { observer.disconnect(); show(); }
+      });
+      observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    }
+    window.usCloseAoutMessage = function () { if (overlay) overlay.classList.remove("us-show"); };
+  })();
+</script>
 </body>
 </html>
