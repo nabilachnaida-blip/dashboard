@@ -148,6 +148,7 @@
           appels: null, visite: null,
           ifmia_diplomes: null, ifmia_non_diplomes: null,
           depart_ifmia: null,
+          vivier:null,
         };
       }
       return manualByWeek[key];
@@ -173,7 +174,10 @@
         manualField = "visite";
       } else if (label.indexOf("depart") !== -1 && label.indexOf("ifmia") !== -1) {
         manualField = "depart_ifmia";
-      }
+
+      } else if (label.indexOf("vivier") !== -1) {
+  manualField = "vivier";
+}
       if (!kind && !manualField) continue;
 
       Object.keys(weekCols).forEach(function (colStr) {
@@ -533,6 +537,7 @@
     var appelsThisWeek = manualEntry && manualEntry.appels !== null ? manualEntry.appels : null;
     var visiteThisWeek = manualEntry && manualEntry.visite !== null ? manualEntry.visite : null;
     var departIfmiaThisWeek = manualEntry && manualEntry.depart_ifmia !== null ? manualEntry.depart_ifmia : null;
+    var vivierThisWeek = manualEntry && manualEntry.vivier !== null ? manualEntry.vivier : null;
 
     // Arrivées prévues — a hand-maintained list of upcoming arrivals (see
     // the "Arrivees Prevues" sheet). Always shown regardless of the
@@ -556,6 +561,7 @@
       this_week_label: "S" + cur.isoWeek,
       formation: { labels: formationLabels, estimation: formationEstimation, reel: formationReel },
       appels_this_week: appelsThisWeek,
+      vivier_this_week: vivierThisWeek,
       visite_this_week: visiteThisWeek,
       depart_ifmia_this_week: departIfmiaThisWeek,
       ifmia_diplomes_total: ifmiaDiplomesTotal,
@@ -832,6 +838,8 @@
       if (card) card.style.display = "";
       setKpiValue(elId, value);
     }
+    document.getElementById("us-vivier-week-label").textContent = d.this_week_label || "cette semaine";
+    setKpiValue("us-kpi-vivier", d.vivier_this_week);
 
     document.getElementById("us-appels-week-label").textContent = d.this_week_label || "cette semaine";
     setKpiValue("us-kpi-appels", d.appels_this_week);
