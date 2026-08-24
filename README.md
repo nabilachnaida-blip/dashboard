@@ -49,7 +49,7 @@ Une case vide affiche "Non renseigné". Si cette feuille est absente du
 fichier (ancien `suivi.xlsx`), ces deux KPIs affichent juste "Non renseigné"
 sans faire planter le reste.
 
-⚠️ Si tu modifies `suivi.xlsx` avec un script Python (openpyxl) plutôt
+ Si tu modifies `suivi.xlsx` avec un script Python (openpyxl) plutôt
 qu'à la main dans Excel : ouvrir un classeur sans `data_only=True` puis le
 resauvegarder **efface les valeurs mises en cache des cellules-formules**
 (Réel/Écart de Feuil3 notamment). Édite plutôt directement dans Excel/LibreOffice,
