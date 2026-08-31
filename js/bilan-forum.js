@@ -1,8 +1,8 @@
 (function () {
-  var LABELS = ["Journée 1", "Journée 2", "Journée 3", "Journée 4", "Journée 5", "Journée 6", "Journée 7", "Journée 8", "Journée 9", "Journée 10"];
-  var CONVOQUES = [230, 203, 207, 177, 184, 184, 180, 179, 227, 124];
-  var PRESENTS = [111, 97, 109, 83, 90, 90, 75, 99, 107, 49];
-  var RETENUS = [109, 95, 106, 78, 83, 83, 70, 86, 102, 48];
+  var LABELS = ["Journée 1", "Journée 2", "Journée 3", "Journée 4", "Journée 5", "Journée 6", "Journée 7", "Journée 8", "Journée 9", "Journée 10", "Journée 11", "Journée 12", "Journée 13", "Journée 14", "Journée 15", "Journée 16", "Journée 17"];
+  var CONVOQUES = [230, 203, 207, 177, 184, 184, 180, 179, 227, 124, 240,169,116,184,192,161,230];
+  var PRESENTS = [111, 97, 109, 83, 90, 90, 75, 99, 107, 49,103,65,56,106,98,81,100];
+  var RETENUS = [109, 95, 106, 78, 83, 83, 70, 86, 102, 48, 95,63,52,101,95,77,100];
 
   var COLOR_CONVOQUES = "#0D6FA3";
   var COLOR_PRESENTS = "#00B3B8";
