@@ -292,6 +292,22 @@ body.us-locked main,body.us-locked #us-welcome-overlay,body.us-locked #us-aout-m
 
 .us-tbl-total td{font-weight:800;background:#f8fafc;}
 
+/* ── Chart header + pagination des journées (js/bilan-forum.js) ── */
+.us-chart-head{display:flex;align-items:center;justify-content:space-between;gap:14px;
+                flex-wrap:wrap;margin-bottom:14px;}
+.us-chart-head .us-chart-title{margin-bottom:0;}
+.us-chart-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.us-chart-nav-range{font-family:var(--font-cond);font-size:12px;font-weight:800;color:#0B3F91;
+                     background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:5px 12px;
+                     white-space:nowrap;}
+.us-chart-nav-btn{padding:6px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;
+                   color:#0B3F91;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
+                   transition:background .15s ease,border-color .15s ease,color .15s ease;}
+.us-chart-nav-btn:hover:not(:disabled){background:#eff6ff;border-color:#bfdbfe;}
+.us-chart-nav-btn:disabled{opacity:.4;cursor:default;}
+.us-chart-nav-btn.us-chart-nav-all{background:#0B3F91;border-color:#0B3F91;color:#fff;}
+.us-chart-nav-btn.us-chart-nav-all:hover:not(:disabled){background:#072C5A;border-color:#072C5A;}
+
 /* ── Scroll-reveal + count-up interaction (js/reveal.js) ──
    Elements start hidden/offset; reveal.js's IntersectionObserver adds
    .us-visible as each one enters the viewport, and drives the count-up
