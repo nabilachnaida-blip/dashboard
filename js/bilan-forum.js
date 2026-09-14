@@ -1,10 +1,10 @@
 (function () {
-  var LABELS = ["Journée 1", "Journée 2", "Journée 3", "Journée 4", "Journée 5", "Journée 6", "Journée 7", "Journée 8", "Journée 9", "Journée 10", "Journée 11", "Journée 12", "Journée 13", "Journée 14", "Journée 15", "Journée 16", "Journée 17", "Journée 18", "Journée 19", "Journée 20", "Journée 21"
+  var LABELS = ["Journée 1", "Journée 2", "Journée 3", "Journée 4", "Journée 5", "Journée 6", "Journée 7", "Journée 8", "Journée 9", "Journée 10", "Journée 11", "Journée 12", "Journée 13", "Journée 14", "Journée 15", "Journée 16", "Journée 17", "Journée 18", "Journée 19", "Journée 20", "Journée 21", "Journée 22", "Journée 23"
 
   ];
-  var CONVOQUES = [230, 203, 207, 177, 184, 184, 180, 179, 227, 124, 240,169,116,184,192,161,230,100,178, 207,161];
-  var PRESENTS = [111, 97, 109, 83, 90, 90, 75, 99, 107, 49,103,65,56,106,98,81,100,58,88,118,88];
-  var RETENUS = [109, 95, 106, 78, 83, 83, 70, 86, 102, 48, 95,63,52,101,95,77,100,55,84,118,84];
+  var CONVOQUES = [230, 203, 207, 177, 184, 184, 180, 179, 227, 124, 240,169,116,184,192,161,230,100,178, 207,161,202,186];
+  var PRESENTS = [111, 97, 109, 83, 90, 90, 75, 99, 107, 49,103,65,56,106,98,81,100,58,88,118,88,100,97];
+  var RETENUS = [109, 95, 106, 78, 83, 83, 70, 86, 102, 48, 95,63,52,101,95,77,100,55,84,118,84,98,95];
 
   var COLOR_CONVOQUES = "#0D6FA3";
   var COLOR_PRESENTS = "#00B3B8";
@@ -20,8 +20,7 @@
 
   function render() {
     if (!chart) return;
-    var from = showAll ? 0 : start;
-    var to = showAll ? LABELS.length : Math.min(LABELS.length, start + PAGE_SIZE);
+     var to = showAll ? LABELS.length : Math.min(LABELS.length, start + PAGE_SIZE);
 
     chart.setOption({
       xAxis: {
