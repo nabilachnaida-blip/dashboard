@@ -66,6 +66,9 @@ body.us-locked main,body.us-locked #us-welcome-overlay,body.us-locked #us-aout-m
              position:relative;overflow:hidden;display:flex;gap:14px;align-items:flex-start;
              transition:transform .15s ease,box-shadow .15s ease;}
 .us-kpi-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,23,42,.10);}
+/* Permanently hidden KPI card — !important so dashboard.js's inline
+   style.display resets (setDeptKpiValue) can't bring it back. */
+.us-kpi-card.us-kpi-hidden{display:none !important;}
 .us-kpi-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;}
 .us-kpi-card::after{content:"";position:absolute;right:-30px;top:-30px;width:100px;height:100px;border-radius:50%;opacity:.06;}
 .us-kpi-icon{width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
