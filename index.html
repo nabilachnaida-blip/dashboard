@@ -126,25 +126,26 @@
   <div class="us-hero us-reveal" style="margin-top:44px;">
     <div>
       <div class="us-hero-title">Bilan du forum d'emploi</div>
-      <div class="us-hero-sub">Résultats de la campagne de convocation, présence et rétention sur les 8 journées du forum.</div>
+      <div class="us-hero-sub">Résultats de la campagne de convocation, présence et rétention sur les <span id="us-forum-days-count">…</span> journées du forum.</div>
     </div>
   </div>
 
+  <!-- Valeurs et pourcentages remplis par js/bilan-forum.js à partir des données par journée -->
   <div class="us-stat-highlights us-reveal-stagger">
     <div class="us-stat-highlight us-reveal-item">
-      <div class="us-stat-highlight-value" data-count-to="1711">0</div>
+      <div class="us-stat-highlight-value" id="us-forum-kpi-convoques">0</div>
       <div class="us-stat-highlight-label">Candidats convoqués</div>
     </div>
     <div class="us-stat-highlight us-reveal-item">
-      <div class="us-stat-highlight-value" data-count-to="820">0</div>
-      <div class="us-stat-highlight-label">Présents — 52,1 % de perte</div>
+      <div class="us-stat-highlight-value" id="us-forum-kpi-presents">0</div>
+      <div class="us-stat-highlight-label" id="us-forum-kpi-presents-label">Présents</div>
     </div>
     <div class="us-stat-highlight us-reveal-item">
-      <div class="us-stat-highlight-value" data-count-to="777">0</div>
-      <div class="us-stat-highlight-label">Retenus — 5,2 % de perte vs présents</div>
+      <div class="us-stat-highlight-value" id="us-forum-kpi-retenus">0</div>
+      <div class="us-stat-highlight-label" id="us-forum-kpi-retenus-label">Retenus</div>
     </div>
     <div class="us-stat-highlight us-stat-alt us-reveal-item">
-      <div class="us-stat-highlight-value" data-count-to="54.6" data-count-decimals="1" data-count-suffix=" %">0 %</div>
+      <div class="us-stat-highlight-value" id="us-forum-kpi-perte" data-count-decimals="1" data-count-suffix=" %">0 %</div>
       <div class="us-stat-highlight-label">Perte globale — convoqués → retenus</div>
     </div>
   </div>

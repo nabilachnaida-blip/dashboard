@@ -1,10 +1,17 @@
 (function () {
-  var LABELS = ["Journée 1", "Journée 2", "Journée 3", "Journée 4", "Journée 5", "Journée 6", "Journée 7", "Journée 8", "Journée 9", "Journée 10", "Journée 11", "Journée 12", "Journée 13", "Journée 14", "Journée 15", "Journée 16", "Journée 17", "Journée 18", "Journée 19", "Journée 20", "Journée 21", "Journée 22", "Journée 23", "Journée 24"
-
-  ];
+  /* Pour ajouter une journée : ajouter une valeur à la fin de chacun des
+     trois tableaux. Les libellés, les indicateurs du bandeau et le nombre
+     de journées affiché se recalculent tout seuls. */
   var CONVOQUES = [230, 203, 207, 177, 184, 184, 180, 179, 227, 124, 240,169,116,184,192,161,230,100,178, 207,161,202,186,102];
   var PRESENTS = [111, 97, 109, 83, 90, 90, 75, 99, 107, 49,103,65,56,106,98,81,100,58,88,118,88,100,97,63];
   var RETENUS = [109, 95, 106, 78, 83, 83, 70, 86, 102, 48, 95,63,52,101,95,77,100,55,84,118,84,98,95,59];
+
+  var LABELS = CONVOQUES.map(function (_, i) { return "Journée " + (i + 1); });
+
+  if (PRESENTS.length !== CONVOQUES.length || RETENUS.length !== CONVOQUES.length) {
+    console.warn("bilan-forum : les tableaux CONVOQUES / PRESENTS / RETENUS n'ont pas la même longueur ("
+      + CONVOQUES.length + " / " + PRESENTS.length + " / " + RETENUS.length + ")");
+  }
 
   var COLOR_CONVOQUES = "#0D6FA3";
   var COLOR_PRESENTS = "#00B3B8";
@@ -18,9 +25,44 @@
   var start = Math.max(0, LABELS.length - PAGE_SIZE);
   var showAll = false;
 
+  function sum(arr) {
+    return arr.reduce(function (a, b) { return a + b; }, 0);
+  }
+
+  function fmtPct(v) {
+    return v.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+  }
+
+  /* Indicateurs du bandeau : totaux et taux de perte calculés sur toutes
+     les journées. On écrit data-count-to, que reveal.js anime à l'apparition. */
+  function renderKpis() {
+    var conv = sum(CONVOQUES), pres = sum(PRESENTS), ret = sum(RETENUS);
+    var pertePresents = conv ? (conv - pres) / conv * 100 : 0;
+    var perteRetenus = pres ? (pres - ret) / pres * 100 : 0;
+    var perteGlobale = conv ? (conv - ret) / conv * 100 : 0;
+
+    function setCount(id, value) {
+      var el = document.getElementById(id);
+      if (el) el.setAttribute("data-count-to", String(value));
+    }
+    function setText(id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    setText("us-forum-days-count", String(LABELS.length));
+    setCount("us-forum-kpi-convoques", conv);
+    setCount("us-forum-kpi-presents", pres);
+    setText("us-forum-kpi-presents-label", "Présents — " + fmtPct(pertePresents) + " de perte");
+    setCount("us-forum-kpi-retenus", ret);
+    setText("us-forum-kpi-retenus-label", "Retenus — " + fmtPct(perteRetenus) + " de perte vs présents");
+    setCount("us-forum-kpi-perte", perteGlobale.toFixed(1));
+  }
+
   function render() {
     if (!chart) return;
-     var to = showAll ? LABELS.length : Math.min(LABELS.length, start + PAGE_SIZE);
+    var from = showAll ? 0 : start;
+    var to = showAll ? LABELS.length : Math.min(LABELS.length, start + PAGE_SIZE);
 
     chart.setOption({
       xAxis: {
@@ -92,6 +134,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    /* Les KPI sont remplis tout de suite : reveal.js (chargé après) lit
+       data-count-to au moment où le bandeau apparaît. */
+    renderKpis();
     var dom = document.getElementById("us-chart-forum-days");
     if (!dom) return;
     if (!document.body.classList.contains("us-locked")) { buildChart(); return; }
