@@ -470,14 +470,17 @@
     var tfWeeks = Object.keys(tfWeekMap).map(function (k) { return tfWeekMap[k]; })
       .sort(function (x, y) { return x.year - y.year || x.week - y.week; });
 
-    var atelierByWeek = {}; // atelier -> [{iso_year, iso_week, estimation|null, reel}]
+    // Weeks that haven't started yet have no Réel — flagged so the table
+    // shows "—" instead of a fake 0 and keeps them out of Écart cumulé.
+    var atelierByWeek = {}; // atelier -> [{iso_year, iso_week, estimation|null, reel, future}]
     Object.keys(ATELIER_DEPT).forEach(function (atelier) {
       atelierByWeek[atelier] = tfWeeks.map(function (w) {
         var key = atelier + "_" + w.year + "_" + w.week;
         return {
           iso_year: w.year, iso_week: w.week,
           estimation: estimationByAtelierWeek.hasOwnProperty(key) ? estimationByAtelierWeek[key] : null,
-          reel: arrivalsByAtelierWeek[key] || 0
+          reel: arrivalsByAtelierWeek[key] || 0,
+          future: isoWeekMonday(w.year, w.week) > today
         };
       });
     });
@@ -486,7 +489,8 @@
       .sort(function (x, y) { return x.year - y.year || x.week - y.week; });
     var formationLabels = fsSorted.map(function (w) { return "S" + w.week; });
     var formationEstimation = fsSorted.map(function (w) { return w.estimation; });
-    var formationReel = fsSorted.map(function (w) { return w.reel; });
+    // Future weeks: no bar (null) rather than a misleading 0.
+    var formationReel = fsSorted.map(function (w) { return isoWeekMonday(w.year, w.week) > today ? null : w.reel; });
 
     // Habilitation — contrats à venir. Always computed from the full
     // arrivals table (department-scoped only), never from the
@@ -695,8 +699,9 @@
   var lastAtelierByWeek = null;
 
   // Fills the De / À week selectors, keeping the user's choice when it
-  // still exists; otherwise defaults to the last TF_DEFAULT_WEEKS weeks.
-  function populateTfRange(weekLabels) {
+  // still exists; otherwise "À" defaults to the current week (defaultToIdx)
+  // and "De" to TF_DEFAULT_WEEKS weeks before it.
+  function populateTfRange(weekLabels, defaultToIdx) {
     var fromSel = document.getElementById("us-tf-from");
     var toSel = document.getElementById("us-tf-to");
     if (!fromSel || !toSel) return;
@@ -704,9 +709,8 @@
     var opts = weekLabels.map(function (l) { return '<option value="' + l + '">' + l + "</option>"; }).join("");
     fromSel.innerHTML = opts;
     toSel.innerHTML = opts;
-    var n = weekLabels.length;
-    fromSel.value = weekLabels.indexOf(prevFrom) !== -1 ? prevFrom : weekLabels[Math.max(0, n - TF_DEFAULT_WEEKS)];
-    toSel.value = weekLabels.indexOf(prevTo) !== -1 ? prevTo : weekLabels[n - 1];
+    fromSel.value = weekLabels.indexOf(prevFrom) !== -1 ? prevFrom : weekLabels[Math.max(0, defaultToIdx - TF_DEFAULT_WEEKS + 1)];
+    toSel.value = weekLabels.indexOf(prevTo) !== -1 ? prevTo : weekLabels[defaultToIdx];
   }
 
   function renderAtelierTable(atelierByWeek) {
@@ -726,7 +730,10 @@
     }
 
     var allLabels = weeksRef.map(function (w) { return "S" + w.iso_week; });
-    populateTfRange(allLabels);
+    // Current week = last week that has already started (future weeks are flagged).
+    var currentIdx = allLabels.length - 1;
+    while (currentIdx > 0 && weeksRef[currentIdx].future) currentIdx--;
+    populateTfRange(allLabels, currentIdx);
     var fromIdx = Math.max(0, allLabels.indexOf((document.getElementById("us-tf-from") || {}).value));
     var toIdx = allLabels.indexOf((document.getElementById("us-tf-to") || {}).value);
     if (toIdx === -1) toIdx = allLabels.length - 1;
@@ -747,18 +754,19 @@
       // count), then the selected range is cut out — so the cumulative
       // value for a week doesn't change when the range changes.
       var cumul = 0, cumulByIdx = [];
+      function hasEcart(r) { return r.estimation !== null && !r.future; }
       allRows.forEach(function (r, i) {
-        if (r.estimation !== null) cumul += r.reel - r.estimation;
+        if (hasEcart(r)) cumul += r.reel - r.estimation;
         cumulByIdx[i] = cumul;
       });
       var rows = allRows.slice(fromIdx, toIdx + 1);
       var estCells = rows.map(function (r) { return r.estimation === null ? EMPTY_CELL : "<td>" + fmt(r.estimation) + "</td>"; }).join("");
-      var reelCells = rows.map(function (r) { return "<td>" + fmt(r.reel) + "</td>"; }).join("");
+      var reelCells = rows.map(function (r) { return r.future ? EMPTY_CELL : "<td>" + fmt(r.reel) + "</td>"; }).join("");
       var ecartCells = rows.map(function (r) {
-        return r.estimation === null ? EMPTY_CELL : ecartCell(r.reel - r.estimation);
+        return hasEcart(r) ? ecartCell(r.reel - r.estimation) : EMPTY_CELL;
       }).join("");
       var ecartCumulCells = rows.map(function (r, i) {
-        return r.estimation === null ? EMPTY_CELL : ecartCell(cumulByIdx[fromIdx + i]);
+        return hasEcart(r) ? ecartCell(cumulByIdx[fromIdx + i]) : EMPTY_CELL;
       }).join("");
       rowsHtml += "<tr><td rowspan=\"4\" style=\"font-weight:700;\">" + o.label + "</td><td>Estimation</td>" + estCells + "</tr>";
       rowsHtml += "<tr><td>Réel</td>" + reelCells + "</tr>";
