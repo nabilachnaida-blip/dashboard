@@ -16,7 +16,6 @@
 
   var US_BLUE = "#0B3F91";
   var US_ORANGE = "#FF5A1F";
-  var US_CAT_COLORS = ["#0B3F91", "#0D6FA3", "#00B3B8", "#38D6C4", "#6EE7D2", "#9FEDE2", "#FF5A1F", "#4DA8DA"];
 
   // Reads a sheet into a row-array where index i is ALWAYS actual sheet
   // row i (0-indexed), matching XLSX.utils.encode_cell({r: i, ...}). Plain
@@ -88,6 +87,9 @@
     return target;
   }
 
+  var MONTH_NAMES = ["Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."];
+  function monthLabel(year, month) { return MONTH_NAMES[month] + " " + year; }
+
   // ── Excel parsing (mirrors excel_parser.py) ─────────────────────────
   function parseArrivals(rows) {
     var headerRow = -1, colMap = {};
@@ -115,7 +117,9 @@
       if (!dateArr) continue;
       var effInt = parseInt(eff, 10);
       if (isNaN(effInt)) continue;
-      out.push({ departement: clean(dep), effectif: effInt, date_arrivee_usine: dateArr, date_debut_contrat: dateCtr });
+      // Upper-cased so spelling variants ("Bird Cage" / "BIRD CAGE") merge into one département.
+      var depKey = clean(dep).replace(/\s+/g, " ").toUpperCase();
+      out.push({ departement: depKey, effectif: effInt, date_arrivee_usine: dateArr, date_debut_contrat: dateCtr });
     }
     return out;
   }
@@ -202,14 +206,14 @@
     };
   }
 
-  // Locates the "UR" header cell in column A and the S30..S40 week columns
-  // right after it.
+  // Locates the "UR" header cell in column A and every "Sxx" week column
+  // after it — new weeks added to the right are picked up automatically.
   function findUrWeekHeader(rows) {
     for (var r = 0; r < Math.min(rows.length, 10); r++) {
       if (norm((rows[r] || [])[0]) === "ur") {
         var weekCols = {};
         var row = rows[r] || [];
-        for (var c = 1; c <= 11; c++) {
+        for (var c = 1; c < row.length; c++) {
           var m = norm(row[c]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
           if (m) weekCols[c] = parseInt(m[1], 10);
         }
@@ -394,18 +398,9 @@
     if (dateFrom) arrivals = arrivals.filter(function (a) { return a.date_arrivee_usine >= dateFrom; });
     if (dateTo) arrivals = arrivals.filter(function (a) { return a.date_arrivee_usine <= dateTo; });
 
-    var minRelevantDate = null;
-    if (parsed.formation_semaine.length) {
-      var earliest = parsed.formation_semaine.reduce(function (acc, r) {
-        if (!acc) return r;
-        return (r.iso_year < acc.iso_year || (r.iso_year === acc.iso_year && r.iso_week < acc.iso_week)) ? r : acc;
-      }, null);
-      if (earliest) minRelevantDate = isoWeekMonday(earliest.iso_year, earliest.iso_week);
-    }
-
+    // Every week present in "integration Usine" is shown — no cut-off.
     var weekly = {};
     arrivalsAllWeeks.forEach(function (a) {
-      if (minRelevantDate && a.date_arrivee_usine < minRelevantDate) return;
       var info = isoWeekInfo(a.date_arrivee_usine);
       var key = info.isoYear + "_" + info.isoWeek;
       if (!weekly[key]) weekly[key] = { year: info.isoYear, week: info.isoWeek, value: 0 };
@@ -416,11 +411,25 @@
     var weeklyLabels = weeklySorted.map(function (w) { return "S" + w.week; });
     var weeklyValues = weeklySorted.map(function (w) { return w.value; });
 
+    // Same arrivals as the weekly chart, grouped by calendar month.
+    var monthly = {};
+    arrivalsAllWeeks.forEach(function (a) {
+      var y =a.date_arrivee_usine.getUTCFullYear(), m = a.date_arrivee_usine.getUTCMonth();
+      var key = y + "_" + m;
+      if (!monthly[key]) monthly[key] = { year: y, month: m, value: 0 };
+      monthly[key].value += a.effectif;
+    });
+    var monthlySorted = Object.keys(monthly).map(function (k) { return monthly[k]; })
+      .sort(function (x, y) { return x.year - y.year || x.month - y.month; });
+    var monthlyLabels = monthlySorted.map(function (m) { return monthLabel(m.year, m.month); });
+    var monthlyValues = monthlySorted.map(function (m) { return m.value; });
+
     var today = todayUTC();
     // "cette semaine" follows the selected Semaine filter (dateTo is its
     // Sunday) when one is picked — showing that week's real numbers, i.e.
     // the historique — and falls back to today's actual week otherwise.
     var refPoint = dateTo || today;
+    var thisMonthLabel = monthLabel(refPoint.getUTCFullYear(), refPoint.getUTCMonth());
     var cur = isoWeekInfo(refPoint);
     var thisWeekEntry = weeklySorted.filter(function (w) { return w.year === cur.isoYear && w.week === cur.isoWeek; })[0];
     var thisWeekTotal = thisWeekEntry ? thisWeekEntry.value : 0;
@@ -557,6 +566,8 @@
       departments: presentCodes.map(function (c) { return { code: c, label: c }; }),
       selected_departement: depParam,
       weekly_arrivals: { labels: weeklyLabels, values: weeklyValues },
+      monthly_arrivals: { labels: monthlyLabels, values: monthlyValues },
+      this_month_label: thisMonthLabel,
       this_week_total: thisWeekTotal,
       this_week_label: "S" + cur.isoWeek,
       formation: { labels: formationLabels, estimation: formationEstimation, reel: formationReel },
@@ -619,6 +630,26 @@
     });
   }
 
+  function buildMonthlyChart(labels, values, thisMonthLabel) {
+    var dom = document.getElementById("us-chart-monthly");
+    if (!dom) return;
+    if (US_CHARTS.monthly) US_CHARTS.monthly.dispose();
+    var chart = echarts.init(dom);
+    US_CHARTS.monthly = chart;
+    chart.setOption({
+      color: [US_BLUE],
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      grid: { left: "3%", right: "4%", bottom: "3%", top: "10%", containLabel: true },
+      xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
+      yAxis: { type: "value", axisLabel: { fontSize: 11 } },
+      series: [{
+        name: "Entrées", type: "bar", data: values, barMaxWidth: 40,
+        label: { show: true, position: "top", fontSize: 11, color: "#1e293b" },
+        itemStyle: { borderRadius: [4, 4, 0, 0], color: function (p) { return labels[p.dataIndex] === thisMonthLabel ? US_ORANGE : US_BLUE; } }
+      }]
+    });
+  }
+
   function buildFormationChart(labels, estimation, reel) {
     var dom = document.getElementById("us-chart-formation");
     if (!dom) return;
@@ -636,27 +667,6 @@
         { name: "Réel", type: "bar", data: reel, barMaxWidth: 28, itemStyle: { color: US_BLUE, borderRadius: [4, 4, 0, 0] } },
         { name: "Estimation", type: "line", data: estimation, smooth: false, symbol: "circle", symbolSize: 6, lineStyle: { width: 3, color: US_ORANGE }, itemStyle: { color: US_ORANGE } }
       ]
-    });
-  }
-
-  function buildUpcomingChart(byDept) {
-    var dom = document.getElementById("us-chart-upcoming");
-    if (!dom) return;
-    if (US_CHARTS.upcoming) US_CHARTS.upcoming.dispose();
-    var chart = echarts.init(dom);
-    US_CHARTS.upcoming = chart;
-    var labels = byDept.map(function (d) { return d.label; });
-    var values = byDept.map(function (d) { return d.effectif; });
-    chart.setOption({
-      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-      grid: { left: "3%", right: "8%", bottom: "3%", top: "5%", containLabel: true },
-      xAxis: { type: "value", axisLabel: { fontSize: 11 } },
-      yAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 }, inverse: true },
-      series: [{
-        name: "Contrats à venir", type: "bar", data: values, barMaxWidth: 22,
-        itemStyle: { borderRadius: [0, 4, 4, 0], color: function (p) { return US_CAT_COLORS[p.dataIndex % US_CAT_COLORS.length]; } },
-        label: { show: true, position: "right", fontSize: 11, color: "#1e293b" }
-      }]
     });
   }
 
@@ -771,7 +781,7 @@
     document.getElementById("us-empty").style.display = "none";
 
     populateDepartments(d.departments, d.selected_departement);
-    populateWeeks(d.formation.labels);
+    populateWeeks(d.weekly_arrivals.labels);
 
     lastRenderedWeekLabel = d.this_week_label || null;
     document.getElementById("us-this-week-label").textContent = d.this_week_label || "cette semaine";
@@ -883,8 +893,8 @@
 
     setTimeout(function () {
       buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);
+      buildMonthlyChart(d.monthly_arrivals.labels, d.monthly_arrivals.values, d.this_month_label);
       buildFormationChart(d.formation.labels, d.formation.estimation, d.formation.reel);
-      buildUpcomingChart(d.upcoming_contracts.by_departement);
     }, 50);
   }
 
@@ -1162,13 +1172,24 @@
     refresh();
   };
 
-  function init() {
-    var errEl = document.getElementById("us-error");
-    fetch("suivi.xlsx")
+  // suivi.xlsx servi à côté de la page ; sinon (double-clic, file://) la copie intégrée à la page
+  function loadSuiviBuffer() {
+    return fetch("suivi.xlsx", { cache: "no-store" }) // always read the latest saved file, never a cached copy
       .then(function (r) {
         if (!r.ok) throw new Error("Impossible de charger suivi.xlsx (HTTP " + r.status + ")");
         return r.arrayBuffer();
       })
+      .catch(function (e) {
+        if (!window.US_SUIVI_B64) throw e;
+        var bin = atob(window.US_SUIVI_B64), buf = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        return buf.buffer;
+      });
+  }
+
+  function init() {
+    var errEl = document.getElementById("us-error");
+    loadSuiviBuffer()
       .then(function (buf) {
         rawWorkbook = XLSX.read(buf, { type: "array", cellDates: true });
         parsedWorkbook = parseSuiviWorkbookData(rawWorkbook);

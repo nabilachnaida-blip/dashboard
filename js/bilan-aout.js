@@ -6,11 +6,13 @@
   var US_OCEAN = "#0D6FA3";
   var TOP_DEPT_COUNT = 4; // table/chart keep only the most significant departments
 
-  // Campaign window this bulletin reports on — fixed, not "today minus N days":
-  // it matches the 622 figure exactly (arrivals already logged through the
-  // end of the arrêt annuel campaign, a few days past the publish date).
-  var PERIOD_FROM = new Date(Date.UTC(2026, 6, 30)); // 30 juillet 2026
-  var PERIOD_TO = new Date(Date.UTC(2026, 7, 27)); // 27 août 2026
+  // Window this section reports on: "Depuis août jusqu'à aujourd'hui" —
+  // from 1 August 2026 up to the visitor's today, recalculated on every load.
+  var PERIOD_FROM = new Date(Date.UTC(2026, 7, 1)); // 1er août 2026
+  function todayUTC() {
+    var now = new Date();
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  }
 
   function clean(v) { return v === null || v === undefined ? "" : String(v).trim(); }
   function norm(v) {
@@ -69,7 +71,8 @@
       if (!dateArr) continue;
       var effInt = parseInt(eff, 10);
       if (isNaN(effInt)) continue;
-      out.push({ departement: clean(dep), effectif: effInt, date_arrivee_usine: dateArr });
+      // Upper-cased so spelling variants ("Bird Cage" / "BIRD CAGE") merge — same as js/dashboard.js.
+      out.push({ departement: clean(dep).replace(/\s+/g, " ").toUpperCase(), effectif: effInt, date_arrivee_usine: dateArr });
     }
     return out;
   }
@@ -132,34 +135,110 @@
     window.addEventListener("resize", function () { chart.resize(); });
   }
 
-  function loadData() {
-    fetch("suivi.xlsx")
+  // Monthly arrivals stacked by department: the top departments keep their own
+  // colour, every other department is grouped under "Autres"; the month total sits on top.
+  var DEPT_COLORS = [US_BLUE, US_OCEAN, "#3987e5", "#9ec5f4"];
+  var OTHER_COLOR = "#cbd5e1";
+  var MONTH_NAMES = ["Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."];
+  function buildMonthDeptChart(byMonthDep, topNames) {
+    var dom = document.getElementById("us-chart-aout-monthly");
+    if (!dom || typeof echarts === "undefined") return;
+    var months = Object.keys(byMonthDep).sort(); // "YYYY-MM"
+    var labels = months.map(function (m) { return MONTH_NAMES[+m.slice(5) - 1] + " " + m.slice(0, 4); });
+    var valueFor = function (w, keep) {
+      var deps = byMonthDep[w], v = 0;
+      Object.keys(deps).forEach(function (d) { if (keep(d)) v += deps[d]; });
+      return v || null;
+    };
+    var series = topNames.map(function (name) {
+      return { name: name, keep: function (d) { return d === name; } };
+    }).concat([{ name: "Autres", keep: function (d) { return topNames.indexOf(d) === -1; } }])
+      .map(function (s) {
+        return {
+          name: s.name, type: "bar", stack: "dept", barMaxWidth: 40,
+          data: months.map(function (w) { return valueFor(w, s.keep); }),
+          label: { show: true, fontSize: 10, color: "#fff", fontWeight: 700,
+                   formatter: function (p) { return p.value >= 5 ? p.value : ""; } }
+        };
+      })
+      .filter(function (s) { return s.data.some(function (v) { return v; }); });
+    // Invisible series carrying the month total as a label above each stack
+    series.push({
+      name: "Total", type: "bar", stack: "dept", data: months.map(function () { return 0; }),
+      itemStyle: { color: "transparent" }, tooltip: { show: false },
+      label: { show: true, position: "top", fontSize: 12, color: "#1e293b", fontWeight: 700,
+               formatter: function (p) { return fmt(valueFor(months[p.dataIndex], function () { return true; })); } }
+    });
+    var chart = echarts.init(dom);
+    chart.setOption({
+      color: DEPT_COLORS.slice(0, topNames.length).concat([OTHER_COLOR]),
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      legend: { top: 0, data: series.map(function (s) { return s.name; }).filter(function (n) { return n !== "Total"; }), textStyle: { fontSize: 11, color: "#1e293b" } },
+      grid: { left: "3%", right: "4%", bottom: "3%", top: 40, containLabel: true },
+      xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11, color: "#1e293b" } },
+      yAxis: { type: "value", axisLabel: { fontSize: 11, color: "#1e293b" } },
+      series: series
+    });
+    window.addEventListener("resize", function () { chart.resize(); });
+  }
+
+  // suivi.xlsx servi à côté de la page ; sinon (double-clic, file://) la copie intégrée à la page
+  function loadSuiviBuffer() {
+    return fetch("suivi.xlsx", { cache: "no-store" }) // always read the latest saved file, never a cached copy
       .then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
+        if (!r.ok) throw new Error("Impossible de charger suivi.xlsx (HTTP " + r.status + ")");
         return r.arrayBuffer();
       })
+      .catch(function (e) {
+        if (!window.US_SUIVI_B64) throw e;
+        var bin = atob(window.US_SUIVI_B64), buf = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        return buf.buffer;
+      });
+  }
+
+  function loadData() {
+    loadSuiviBuffer()
       .then(function (buf) {
         var wb = XLSX.read(buf, { type: "array", cellDates: true });
         var arrivals = parseArrivals(sheetRows(wb.Sheets[SHEET_ARRIVALS]));
+        var periodTo = todayUTC();
         var period = arrivals.filter(function (a) {
-          return a.date_arrivee_usine >= PERIOD_FROM && a.date_arrivee_usine <= PERIOD_TO;
+          return a.date_arrivee_usine >= PERIOD_FROM && a.date_arrivee_usine <= periodTo;
         });
 
-        var byDep = {}, byWeek = {}, total = 0;
+        var byDep = {}, byWeek = {}, byMonthDep = {}, total = 0;
         period.forEach(function (a) {
           byDep[a.departement] = (byDep[a.departement] || 0) + a.effectif;
           var w = isoWeekInfo(a.date_arrivee_usine);
           byWeek[w] = (byWeek[w] || 0) + a.effectif;
+          var m = a.date_arrivee_usine.toISOString().slice(0, 7);
+          byMonthDep[m] = byMonthDep[m] || {};
+          byMonthDep[m][a.departement] = (byMonthDep[m][a.departement] || 0) + a.effectif;
           total += a.effectif;
         });
 
         var totalEl = document.getElementById("us-aout-verified-total");
         if (totalEl) totalEl.textContent = fmt(total);
 
+        // Headline total — animated by reveal.js; if the card was already
+        // revealed before the file finished loading, animate it now.
+        var kpiEl = document.getElementById("us-aout-kpi-total");
+        if (kpiEl) {
+          kpiEl.setAttribute("data-count-to", String(total));
+          var group = kpiEl.closest(".us-reveal-stagger");
+          if (group && group.classList.contains("us-visible") && window.usAnimateCount) window.usAnimateCount(kpiEl);
+        }
+
+        var weeks = Object.keys(byWeek).map(Number).sort(function (a, b) { return a - b; });
+        var rangeEl = document.getElementById("us-aout-week-range");
+        if (rangeEl && weeks.length) rangeEl.textContent = "Progression S" + weeks[0] + " → S" + weeks[weeks.length - 1];
+
         var top = topDepts(byDep);
         renderDeptTable(top);
         buildDeptChart(top);
         buildWeekChart(byWeek);
+        buildMonthDeptChart(byMonthDep, top.map(function (r) { return r.departement; }));
       })
       .catch(function (e) {
         var box = document.getElementById("us-aout-data-error");

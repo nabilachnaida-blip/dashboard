@@ -24,6 +24,8 @@
     }
     requestAnimationFrame(step);
   }
+  // Exposed for values that arrive after the reveal (e.g. totals read from suivi.xlsx).
+  window.usAnimateCount = animateCount;
 
   function reveal(el) {
     el.classList.add("us-visible");
