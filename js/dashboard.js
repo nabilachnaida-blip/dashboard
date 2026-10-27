@@ -450,21 +450,36 @@
       arrivalsByAtelierWeek[key] = (arrivalsByAtelierWeek[key] || 0) + a.effectif;
     });
 
-    var atelierByWeek = {}; // atelier -> [{iso_year, iso_week, estimation, reel}]
+    var estimationByAtelierWeek = {};
     var fsByWeek = {};
     parsed.formation_semaine.forEach(function (fs) {
       var reelVal = arrivalsByAtelierWeek[fs.atelier + "_" + fs.iso_year + "_" + fs.iso_week] || 0;
-
-      if (!atelierByWeek[fs.atelier]) atelierByWeek[fs.atelier] = [];
-      atelierByWeek[fs.atelier].push({ iso_year: fs.iso_year, iso_week: fs.iso_week, estimation: fs.estimation || 0, reel: reelVal });
+      estimationByAtelierWeek[fs.atelier + "_" + fs.iso_year + "_" + fs.iso_week] = fs.estimation || 0;
 
       var key = fs.iso_year + "_" + fs.iso_week;
       if (!fsByWeek[key]) fsByWeek[key] = { year: fs.iso_year, week: fs.iso_week, estimation: 0, reel: 0 };
       fsByWeek[key].estimation += fs.estimation || 0;
       fsByWeek[key].reel += reelVal;
     });
-    Object.keys(atelierByWeek).forEach(function (k) {
-      atelierByWeek[k].sort(function (x, y) { return x.iso_year - y.iso_year || x.iso_week - y.iso_week; });
+
+    // Task Force table covers every week in the file: arrival weeks plus
+    // Estimation weeks. Weeks with no Estimation column get estimation: null.
+    var tfWeekMap = {};
+    weeklySorted.forEach(function (w) { tfWeekMap[w.year + "_" + w.week] = { year: w.year, week: w.week }; });
+    parsed.formation_semaine.forEach(function (fs) { tfWeekMap[fs.iso_year + "_" + fs.iso_week] = { year: fs.iso_year, week: fs.iso_week }; });
+    var tfWeeks = Object.keys(tfWeekMap).map(function (k) { return tfWeekMap[k]; })
+      .sort(function (x, y) { return x.year - y.year || x.week - y.week; });
+
+    var atelierByWeek = {}; // atelier -> [{iso_year, iso_week, estimation|null, reel}]
+    Object.keys(ATELIER_DEPT).forEach(function (atelier) {
+      atelierByWeek[atelier] = tfWeeks.map(function (w) {
+        var key = atelier + "_" + w.year + "_" + w.week;
+        return {
+          iso_year: w.year, iso_week: w.week,
+          estimation: estimationByAtelierWeek.hasOwnProperty(key) ? estimationByAtelierWeek[key] : null,
+          reel: arrivalsByAtelierWeek[key] || 0
+        };
+      });
     });
 
     var fsSorted = Object.keys(fsByWeek).map(function (k) { return fsByWeek[k]; })
@@ -676,10 +691,29 @@
     { key: "PEINTURE", label: "Peinture" }
   ];
 
+  var TF_DEFAULT_WEEKS = 10; // weeks shown by default in the Task Force table
+  var lastAtelierByWeek = null;
+
+  // Fills the De / À week selectors, keeping the user's choice when it
+  // still exists; otherwise defaults to the last TF_DEFAULT_WEEKS weeks.
+  function populateTfRange(weekLabels) {
+    var fromSel = document.getElementById("us-tf-from");
+    var toSel = document.getElementById("us-tf-to");
+    if (!fromSel || !toSel) return;
+    var prevFrom = fromSel.value, prevTo = toSel.value;
+    var opts = weekLabels.map(function (l) { return '<option value="' + l + '">' + l + "</option>"; }).join("");
+    fromSel.innerHTML = opts;
+    toSel.innerHTML = opts;
+    var n = weekLabels.length;
+    fromSel.value = weekLabels.indexOf(prevFrom) !== -1 ? prevFrom : weekLabels[Math.max(0, n - TF_DEFAULT_WEEKS)];
+    toSel.value = weekLabels.indexOf(prevTo) !== -1 ? prevTo : weekLabels[n - 1];
+  }
+
   function renderAtelierTable(atelierByWeek) {
     var thead = document.getElementById("us-atelier-tbl-head");
     var tbody = document.getElementById("us-atelier-tbl-body");
     if (!thead || !tbody) return;
+    lastAtelierByWeek = atelierByWeek;
 
     var weeksRef = null;
     ATELIER_ORDER.forEach(function (o) {
@@ -691,24 +725,40 @@
       return;
     }
 
-    var weekLabels = weeksRef.map(function (w) { return "S" + w.iso_week; });
+    var allLabels = weeksRef.map(function (w) { return "S" + w.iso_week; });
+    populateTfRange(allLabels);
+    var fromIdx = Math.max(0, allLabels.indexOf((document.getElementById("us-tf-from") || {}).value));
+    var toIdx = allLabels.indexOf((document.getElementById("us-tf-to") || {}).value);
+    if (toIdx === -1) toIdx = allLabels.length - 1;
+    if (toIdx < fromIdx) { var t = fromIdx; fromIdx = toIdx; toIdx = t; }
+    var weekLabels = allLabels.slice(fromIdx, toIdx + 1);
     thead.innerHTML = "<tr><th>Atelier</th><th>Type</th>" + weekLabels.map(function (l) { return "<th>" + l + "</th>"; }).join("") + "</tr>";
+
+    var EMPTY_CELL = '<td style="color:#94a3b8;">—</td>';
+    function ecartCell(v) {
+      var color = v > 0 ? "#0a7c55" : v < 0 ? "#c2410c" : "#1e293b";
+      return '<td style="color:' + color + ';font-weight:700;">' + (v > 0 ? "+" : "") + v + "</td>";
+    }
 
     var rowsHtml = "";
     ATELIER_ORDER.forEach(function (o) {
-      var rows = atelierByWeek[o.key] || [];
-      var estCells = rows.map(function (r) { return "<td>" + fmt(r.estimation) + "</td>"; }).join("");
+      var allRows = atelierByWeek[o.key] || [];
+      // Écart cumulé runs over every week (only weeks with an Estimation
+      // count), then the selected range is cut out — so the cumulative
+      // value for a week doesn't change when the range changes.
+      var cumul = 0, cumulByIdx = [];
+      allRows.forEach(function (r, i) {
+        if (r.estimation !== null) cumul += r.reel - r.estimation;
+        cumulByIdx[i] = cumul;
+      });
+      var rows = allRows.slice(fromIdx, toIdx + 1);
+      var estCells = rows.map(function (r) { return r.estimation === null ? EMPTY_CELL : "<td>" + fmt(r.estimation) + "</td>"; }).join("");
       var reelCells = rows.map(function (r) { return "<td>" + fmt(r.reel) + "</td>"; }).join("");
-      var cumul = 0;
       var ecartCells = rows.map(function (r) {
-        var e = r.reel - r.estimation;
-        var color = e > 0 ? "#0a7c55" : e < 0 ? "#c2410c" : "#1e293b";
-        return '<td style="color:' + color + ';font-weight:700;">' + (e > 0 ? "+" : "") + e + "</td>";
+        return r.estimation === null ? EMPTY_CELL : ecartCell(r.reel - r.estimation);
       }).join("");
-      var ecartCumulCells = rows.map(function (r) {
-        cumul += r.reel - r.estimation;
-        var color = cumul > 0 ? "#0a7c55" : cumul < 0 ? "#c2410c" : "#1e293b";
-        return '<td style="color:' + color + ';font-weight:700;">' + (cumul > 0 ? "+" : "") + cumul + "</td>";
+      var ecartCumulCells = rows.map(function (r, i) {
+        return r.estimation === null ? EMPTY_CELL : ecartCell(cumulByIdx[fromIdx + i]);
       }).join("");
       rowsHtml += "<tr><td rowspan=\"4\" style=\"font-weight:700;\">" + o.label + "</td><td>Estimation</td>" + estCells + "</tr>";
       rowsHtml += "<tr><td>Réel</td>" + reelCells + "</tr>";
@@ -1201,6 +1251,10 @@
 
     document.getElementById("us-dept-select").addEventListener("change", refresh);
     document.getElementById("us-week-select").addEventListener("change", refresh);
+    ["us-tf-from", "us-tf-to"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener("change", function () { if (lastAtelierByWeek) renderAtelierTable(lastAtelierByWeek); });
+    });
   }
 
   window.addEventListener("resize", function () {
