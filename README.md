@@ -26,6 +26,11 @@ git push
 ```
 GitHub Pages republie automatiquement en 1-2 minutes.
 
+**À chaque import de `suivi.xlsx`**, double-clique sur `Mettre a jour.bat` : il enregistre
+une copie du fichier dans `index.html` et `dashboard.html` (entre `@@DATA-START` et
+`@@DATA-END`). Les pages ouvertes en double-clic (sans serveur) affichent alors ces données ;
+servies en http (GitHub Pages, `serve.bat`), elles lisent toujours `suivi.xlsx` directement.
+
 ## Tester en local avant de pousser
 
 Ouvrir `index.html` directement (double-clic) ne fonctionnera pas — les
