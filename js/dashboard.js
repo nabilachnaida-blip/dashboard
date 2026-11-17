@@ -206,21 +206,23 @@
     };
   }
 
-  // Locates the "UR" header cell in column A and every "Sxx" week column
-  // after it — new weeks added to the right are picked up automatically.
+  // Locates the "UR" header cell (in any column — the grid may sit to the
+  // right of other data) and every "Sxx" week column after it — new weeks
+  // added to the right are picked up automatically.
   function findUrWeekHeader(rows) {
     for (var r = 0; r < Math.min(rows.length, 10); r++) {
-      if (norm((rows[r] || [])[0]) === "ur") {
+      var row = rows[r] || [];
+      for (var urCol = 0; urCol < row.length; urCol++) {
+        if (norm(row[urCol]) !== "ur") continue;
         var weekCols = {};
-        var row = rows[r] || [];
-        for (var c = 1; c < row.length; c++) {
+        for (var c = urCol + 1; c < row.length; c++) {
           var m = norm(row[c]).replace(/\s+/g, "").match(/^s(\d{1,2})$/);
           if (m) weekCols[c] = parseInt(m[1], 10);
         }
-        return { headerRow: r, weekCols: weekCols };
+        return { headerRow: r, urCol: urCol, weekCols: weekCols };
       }
     }
-    return { headerRow: -1, weekCols: {} };
+    return { headerRow: -1, urCol: 0, weekCols: {} };
   }
 
   // Generic UR × semaine grid parser — used for both the "En formation
@@ -235,7 +237,7 @@
     var out = [];
     for (var i = headerRow + 1; i < rows.length; i++) {
       var rr = rows[i] || [];
-      var ur = rr[0];
+      var ur = rr[header.urCol];
       if (!clean(ur)) continue;
       Object.keys(weekCols).forEach(function (colStr) {
         var col = Number(colStr), week = weekCols[colStr];
@@ -246,6 +248,23 @@
         out.push({ ur: clean(ur), iso_year: anchorYear, iso_week: week, effectif: valInt });
       });
     }
+    return out;
+  }
+
+  // "En formation IFMIA" also holds a list, left of the UR grid and without
+  // header row: A = département, B = effectif, C = date de début de
+  // formation, D = date de fin. Only rows with all three of A/B/C filled
+  // in are kept, so titles and blank lines are skipped.
+  function parseFormationList(rows) {
+    var out = [];
+    rows.forEach(function (rr) {
+      rr = rr || [];
+      var dep = clean(rr[0]);
+      var effInt = parseInt(rr[1], 10);
+      var dateDebut = parseDate(rr[2]);
+      if (!dep || isNaN(effInt) || !dateDebut) return;
+      out.push({ departement: dep.replace(/\s+/g, " ").toUpperCase(), effectif: effInt, date_debut: dateDebut, date_fin: parseDate(rr[3]) });
+    });
     return out;
   }
 
@@ -332,9 +351,15 @@
     var arrivals = parseArrivals(arrivalsRows);
     if (!arrivals.length) throw new Error("Aucune donnée exploitable dans la feuille '" + SHEET_ARRIVALS + "'");
 
-    var minDate = arrivals[0].date_arrivee_usine;
-    arrivals.forEach(function (a) { if (a.date_arrivee_usine < minDate) minDate = a.date_arrivee_usine; });
-    var anchorYear = isoWeekInfo(minDate).isoYear;
+    // Year the "Sxx" week columns belong to: the year most arrival rows fall
+    // in, so a single mistyped date (e.g. 2020 instead of 2026) can't shift
+    // every week column to the wrong year.
+    var rowsPerYear = {};
+    arrivals.forEach(function (a) {
+      var y = isoWeekInfo(a.date_arrivee_usine).isoYear;
+      rowsPerYear[y] = (rowsPerYear[y] || 0) + 1;
+    });
+    var anchorYear = Number(Object.keys(rowsPerYear).sort(function (x, y) { return rowsPerYear[y] - rowsPerYear[x]; })[0]);
 
     var wiRows = sheetRows(wb.Sheets[SHEET_WEEKLY_INDICATORS]);
     var ifmiaRows = sheetRows(wb.Sheets[SHEET_FORMATION_IFMIA]);
@@ -368,6 +393,7 @@
       anchor_year: anchorYear,
       formation_semaine: weekly.formation_semaine,
       formation_ifmia: parseFormationIfmiaGrid(ifmiaRows, anchorYear),
+      formation_list: parseFormationList(ifmiaRows),
       non_diplomes_grid: parseNonDiplomesGrid(nonDiplomesRows, anchorYear),
       manual_kpis: weekly.manual_kpis,
       problematiques: problematiques,
@@ -547,6 +573,18 @@
         ifmiaDiplomesTotal = r.effectif;
       }
     });
+    // Preferred source: the A–D list of the same sheet. Counts everyone in
+    // training during the viewed week — started (C) on or before its Sunday
+    // and not finished (D) before its Monday. Weeks the list doesn't cover
+    // keep the TOTAL row value above.
+    var curMonday = isoWeekMonday(cur.isoYear, cur.isoWeek);
+    var curSunday = new Date(curMonday.getTime() + 6 * 24 * 3600 * 1000);
+    var inTrainingRows = (parsed.formation_list || []).filter(function (f) {
+      return f.date_debut <= curSunday && (!f.date_fin || f.date_fin >= curMonday);
+    });
+    if (inTrainingRows.length) {
+      ifmiaDiplomesTotal = inTrainingRows.reduce(function (s, f) { return s + f.effectif; }, 0);
+    }
 
     // Non-diplômés — sum across departments (or just the selected one) for
     // the current week, from the UR × semaine grid.
@@ -630,25 +668,6 @@
     return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   }
 
-  function buildWeeklyChart(labels, values, thisWeekLabel) {
-    var dom = document.getElementById("us-chart-weekly");
-    if (!dom) return;
-    if (US_CHARTS.weekly) US_CHARTS.weekly.dispose();
-    var chart = echarts.init(dom);
-    US_CHARTS.weekly = chart;
-    chart.setOption({
-      color: [US_BLUE],
-      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-      grid: { left: "3%", right: "4%", bottom: "3%", top: "10%", containLabel: true },
-      xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
-      yAxis: { type: "value", axisLabel: { fontSize: 11 } },
-      series: [{
-        name: "Entrées", type: "bar", data: values, barMaxWidth: 32,
-        itemStyle: { borderRadius: [4, 4, 0, 0], color: function (p) { return labels[p.dataIndex] === thisWeekLabel ? US_ORANGE : US_BLUE; } }
-      }]
-    });
-  }
-
   function buildMonthlyChart(labels, values, thisMonthLabel) {
     var dom = document.getElementById("us-chart-monthly");
     if (!dom) return;
@@ -666,6 +685,71 @@
         label: { show: true, position: "top", fontSize: 11, color: "#1e293b" },
         itemStyle: { borderRadius: [4, 4, 0, 0], color: function (p) { return labels[p.dataIndex] === thisMonthLabel ? US_ORANGE : US_BLUE; } }
       }]
+    });
+  }
+
+  // Weekly arrivals for one département, chosen in the chart's own selector
+  // (independent of the global Département filter), with the "En formation
+  // IFMIA" list stacked on top (counted in the week of its start date).
+  // Same week axis as the global weekly chart, so empty weeks show as 0.
+  var US_FORMATION_COLOR = "#00B3B8";
+
+  function populateDeptWeeklySelect(arrivals, formationList) {
+    var sel = document.getElementById("us-dept-weekly-select");
+    if (!sel) return;
+    var totals = {};
+    arrivals.forEach(function (a) { totals[a.departement] = (totals[a.departement] || 0) + a.effectif; });
+    (formationList || []).forEach(function (f) { totals[f.departement] = (totals[f.departement] || 0); });
+    var codes = Object.keys(totals).sort();
+    var prev = sel.value;
+    var hadOptions = sel.options.length > 0;
+    sel.innerHTML = '<option value="">Tous les départements</option>' +
+      codes.map(function (c) { return '<option value="' + c + '">' + c + "</option>"; }).join("");
+    if ((hadOptions && prev === "") || codes.indexOf(prev) !== -1) { sel.value = prev; return; }
+    // Default: the département with the most arrivals.
+    sel.value = codes.slice().sort(function (x, y) { return totals[y] - totals[x]; })[0] || "";
+  }
+
+  function buildDeptWeeklyChart() {
+    var dom = document.getElementById("us-chart-dept-weekly");
+    var sel = document.getElementById("us-dept-weekly-select");
+    if (!dom || !sel || !parsedWorkbook) return;
+    var dept = sel.value; // "" = Tous les départements
+
+    var weeks = {}, arrivedByWeek = {}, formationByWeek = {};
+    function addTo(map, date, value, isDept) {
+      var info = isoWeekInfo(date);
+      var key = info.isoYear + "_" + info.isoWeek;
+      weeks[key] = { year: info.isoYear, week: info.isoWeek };
+      if (isDept) map[key] = (map[key] || 0) + value;
+    }
+    parsedWorkbook.arrivals.forEach(function (a) { addTo(arrivedByWeek, a.date_arrivee_usine, a.effectif, !dept || a.departement === dept); });
+    (parsedWorkbook.formation_list || []).forEach(function (f) { addTo(formationByWeek, f.date_debut, f.effectif, !dept || f.departement === dept); });
+    var keys = Object.keys(weeks).sort(function (x, y) { return weeks[x].year - weeks[y].year || weeks[x].week - weeks[y].week; });
+    var labels = keys.map(function (k) { return "S" + weeks[k].week; });
+    var arrived = keys.map(function (k) { return arrivedByWeek[k] || 0; });
+    var formation = keys.map(function (k) { return formationByWeek[k] || 0; });
+    var thisWeekLabel = lastRenderedWeekLabel;
+
+    if (US_CHARTS.deptWeekly) US_CHARTS.deptWeekly.dispose();
+    var chart = echarts.init(dom);
+    US_CHARTS.deptWeekly = chart;
+    chart.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      legend: { data: ["Arrivés usine", "En formation"], top: 0, textStyle: { fontSize: 12 } },
+      grid: { left: "3%", right: "4%", bottom: "3%", top: "14%", containLabel: true },
+      xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
+      yAxis: { type: "value", axisLabel: { fontSize: 11 } },
+      series: [
+        {
+          name: "Arrivés usine", type: "bar", stack: "total", data: arrived, barMaxWidth: 32,
+          itemStyle: { color: function (p) { return labels[p.dataIndex] === thisWeekLabel ? US_ORANGE : US_BLUE; } }
+        },
+        {
+          name: "En formation", type: "bar", stack: "total", data: formation, barMaxWidth: 32,
+          itemStyle: { color: US_FORMATION_COLOR, borderRadius: [4, 4, 0, 0] }
+        }
+      ]
     });
   }
 
@@ -768,10 +852,11 @@
       var ecartCumulCells = rows.map(function (r, i) {
         return hasEcart(r) ? ecartCell(cumulByIdx[fromIdx + i]) : EMPTY_CELL;
       }).join("");
-      rowsHtml += "<tr><td rowspan=\"4\" style=\"font-weight:700;\">" + o.label + "</td><td>Estimation</td>" + estCells + "</tr>";
+      // rowspan 3 while the Écart cumulé row is commented out (put back 4 to show it again)
+      rowsHtml += "<tr><td rowspan=\"3\" style=\"font-weight:700;\">" + o.label + "</td><td>Estimation</td>" + estCells + "</tr>";
       rowsHtml += "<tr><td>Réel</td>" + reelCells + "</tr>";
       rowsHtml += "<tr><td>Écart</td>" + ecartCells + "</tr>";
-      rowsHtml += "<tr><td>Écart cumulé</td>" + ecartCumulCells + "</tr>";
+      // rowsHtml += "<tr><td>Écart cumulé</td>" + ecartCumulCells + "</tr>";
     });
     tbody.innerHTML = rowsHtml;
   }
@@ -826,7 +911,10 @@
   function populateWeeks(weekLabels) {
     var sel = document.getElementById("us-week-select");
     if (!sel || weeksLoaded || !weekLabels || !weekLabels.length) return;
-    weekLabels.forEach(function (label) {
+    // Numeric order (S17, S18 … S47), each week once — not file/date order.
+    var sorted = weekLabels.filter(function (l, i) { return weekLabels.indexOf(l) === i; })
+      .sort(function (a, b) { return parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10); });
+    sorted.forEach(function (label) {
       var opt = document.createElement("option");
       opt.value = label; opt.textContent = label;
       sel.appendChild(opt);
@@ -950,8 +1038,9 @@
     }
 
     setTimeout(function () {
-      buildWeeklyChart(d.weekly_arrivals.labels, d.weekly_arrivals.values, d.this_week_label);
       buildMonthlyChart(d.monthly_arrivals.labels, d.monthly_arrivals.values, d.this_month_label);
+      populateDeptWeeklySelect(parsedWorkbook.arrivals, parsedWorkbook.formation_list);
+      buildDeptWeeklyChart();
       buildFormationChart(d.formation.labels, d.formation.estimation, d.formation.reel);
     }, 50);
   }
@@ -1017,8 +1106,8 @@
     if (kpiKey === "non-diplomes") {
       var ws2 = rawWorkbook.Sheets[SHEET_NON_DIPLOMES_IFMIA];
       var rows2 = sheetRows(ws2);
-      var colOffset = 0; // column A, 0-indexed — its own sheet since the split
       var header2 = findUrWeekHeader(rows2);
+      var colOffset = header2.urCol; // column holding the "UR" labels
       var headerRow = header2.headerRow, weekCols2 = header2.weekCols;
       if (headerRow === -1) return { ok: false, reason: "Grille non-diplômés introuvable." };
       var col2 = -1;
@@ -1044,8 +1133,8 @@
       var urCode = kpiKey === "formation-ferrage" ? "FER" : kpiKey === "formation-montage" ? "MON" : kpiKey === "formation-birdcage" ? "BC" : "TOTAL";
       var ws3 = rawWorkbook.Sheets[SHEET_FORMATION_IFMIA];
       var rows3 = sheetRows(ws3);
-      var dipColOffset = 0; // column A, 0-indexed — see parseFormationIfmiaGrid
       var header3 = findUrWeekHeader(rows3);
+      var dipColOffset = header3.urCol; // column holding the "UR" labels
       var headerRow3 = header3.headerRow, weekCols3 = header3.weekCols;
       if (headerRow3 === -1) return { ok: false, reason: "Tableau des diplômés introuvable." };
       var col3 = -1;
@@ -1259,6 +1348,8 @@
 
     document.getElementById("us-dept-select").addEventListener("change", refresh);
     document.getElementById("us-week-select").addEventListener("change", refresh);
+    var deptWeeklySel = document.getElementById("us-dept-weekly-select");
+    if (deptWeeklySel) deptWeeklySel.addEventListener("change", buildDeptWeeklyChart);
     ["us-tf-from", "us-tf-to"].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener("change", function () { if (lastAtelierByWeek) renderAtelierTable(lastAtelierByWeek); });
